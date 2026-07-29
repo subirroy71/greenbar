@@ -5,10 +5,21 @@ axes:
 tiers:
   trivial:  { gates: [contract] }
   scoped:   { gates: [contract, test] }
-  critical: { gates: [contract, test, coverage, review-record] }
+  critical: { gates: [contract, test, coverage, review] }
 
 gates:
-  contract:      { builtin: contract }
-  test:          { run: "pytest -q" }
-  coverage:      { run: "pytest -q --cov=trellis --cov-fail-under=70" }
-  review-record: { requires_file: ".trellis/review-record.json" }
+  contract: { builtin: contract }
+  test:     { run: "pytest -q" }
+  coverage: { run: "pytest -q --cov=trellis --cov-fail-under=70" }
+  review:   { builtin: review }
+
+# Trellis reviews itself: `trellis review --contract contracts/CONTRACT.md`.
+# The bundled lens is deterministic (the test suite) so a record is producible with no LLM;
+# wire LLM/cross-model lenses (claude / llm / aider) as shown in the template.
+review:
+  parallelism: 3
+  timeout_s: 120
+lenses:
+  - name: tests
+    command: "pytest -q"
+    deterministic: true

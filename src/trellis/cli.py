@@ -13,12 +13,27 @@ import argparse
 import sys
 from pathlib import Path
 
+import subprocess
+from datetime import datetime, timezone
+
 from . import __version__
 from .config import load_config
 from .contract import load_contract, validate_contract
 from .gates import run_tier
+from .review import run_review
 
 _TEMPLATES = Path(__file__).parent / "templates"
+
+
+def _resolve_diff(args) -> str:
+    if args.diff:
+        return Path(args.diff).read_text()
+    base = args.diff_base or None
+    cmd = ["git", "diff", f"{base}...HEAD"] if base else ["git", "diff", "HEAD"]
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True).stdout
+    except Exception:  # noqa: BLE001 — no git / not a repo → empty diff
+        return ""
 
 
 def _cmd_init(args) -> int:
@@ -64,6 +79,24 @@ def _cmd_gate(args) -> int:
     return 1 if failed else 0
 
 
+def _cmd_review(args) -> int:
+    cfg = load_config(args.config)
+    diff = _resolve_diff(args)
+    now = datetime.now(timezone.utc).isoformat()
+    rec = run_review(args.contract, cfg.raw, diff, now=now, out_path=args.out)
+    for lens in rec["lenses"]:
+        line = f"[{lens['verdict']:16}] {lens['name']}"
+        if lens.get("error"):
+            line += f"  ({lens['error']})"
+        print(line)
+        for f in lens.get("findings", []):
+            print(f"    - {f}")
+    m, s = rec["metrics"], rec["summary"]
+    print(f"\ntrellis review: {s['verdict']} · {m['lens_count']} lenses · {m['finding_count']} findings"
+          f"{' · ⚠ all-SIGN/zero-findings' if m['all_sign_no_findings'] else ''}  →  {args.out}")
+    return 1 if s["verdict"] == "BLOCKED" else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="trellis", description="Contract-first, gate-enforced development framework."
@@ -86,6 +119,14 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--config", help="path to trellis.yaml")
     pg.add_argument("-v", "--verbose", action="store_true", help="print detail for passing gates too")
     pg.set_defaults(func=_cmd_gate)
+
+    pr = sub.add_parser("review", help="run the configured lenses and write a review record")
+    pr.add_argument("--contract", help="contract under review (its hash pins record freshness)")
+    pr.add_argument("--diff", help="path to a diff file (default: `git diff HEAD`)")
+    pr.add_argument("--diff-base", help="git ref to diff against (`<base>...HEAD`)")
+    pr.add_argument("--out", default=".trellis/review-record.json", help="where to write the record")
+    pr.add_argument("--config", help="path to trellis.yaml")
+    pr.set_defaults(func=_cmd_review)
     return p
 
 

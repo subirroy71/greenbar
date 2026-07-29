@@ -38,18 +38,25 @@ def test_lint_fails_on_bad_contract(tmp_path, monkeypatch):
     assert main(["lint", str(bad)]) == 1  # non-zero → CI blocks
 
 
-def test_gate_blocks_when_review_record_missing(tmp_path, monkeypatch):
+def test_review_gate_blocks_when_record_missing_then_passes_when_fresh(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     main(["init"])
     contract = tmp_path / "contracts" / "CONTRACT.example.md"
-    # 'critical' requires a review-record artifact that doesn't exist yet → gate fails (exit 1)
-    # (only assert the contract+record interplay; lint/test gates may or may not have tooling here)
     from trellis.config import load_config
     from trellis.gates import run_gate
     cfg = load_config()
-    r = run_gate("review-record", cfg.gates["review-record"], cfg, str(contract))
-    assert r.ok is False
+
+    # no review record yet → the builtin `review` gate fails (blocks merge)
+    assert run_gate("review", cfg.gates["review"], cfg, str(contract)).ok is False
+
+    # a FRESH, non-BLOCK, non-rubber-stamp record for this contract → gate passes
+    import hashlib
+    import json
+    h = hashlib.sha256(contract.read_text().encode()).hexdigest()[:16]
     Path(".trellis").mkdir(exist_ok=True)
-    Path(".trellis/review-record.json").write_text("{}")
-    r2 = run_gate("review-record", cfg.gates["review-record"], cfg, str(contract))
-    assert r2.ok is True
+    Path(".trellis/review-record.json").write_text(json.dumps({
+        "contract_hash": h,
+        "summary": {"verdict": "PASS", "blockers": 0},
+        "metrics": {"lens_count": 2, "all_sign_no_findings": False},
+    }))
+    assert run_gate("review", cfg.gates["review"], cfg, str(contract)).ok is True

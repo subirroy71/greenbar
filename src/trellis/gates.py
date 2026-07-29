@@ -19,6 +19,7 @@ from typing import List, Optional
 
 from .config import TrellisConfig
 from .contract import load_contract, validate_contract
+from .review import check_review_record
 
 
 @dataclass
@@ -41,6 +42,13 @@ def run_gate(name: str, spec: dict, cfg: TrellisConfig, contract: Optional[str])
         errors = [x for x in findings if x.level == "error"]
         detail = "\n".join(f"    {x}" for x in findings) or "    ok"
         return GateResult(name, not errors, detail)
+
+    if spec.get("builtin") == "review":
+        record_path = spec.get("record", ".trellis/review-record.json")
+        ok, detail = check_review_record(
+            contract, record_path, fail_on_rubber_stamp=bool(spec.get("fail_on_rubber_stamp"))
+        )
+        return GateResult(name, ok, detail)
 
     if "requires_file" in spec:
         target = spec["requires_file"]

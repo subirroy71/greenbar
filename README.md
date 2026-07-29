@@ -82,7 +82,32 @@ gates:
   review-record: { requires_file: ".trellis/review-record.json" }
 ```
 
-Three gate kinds: `builtin: contract` (Trellis's validator), `run:` (any command that exits 0 on pass), `requires_file:` (an artifact must exist — e.g. a review-panel record).
+Gate kinds: `builtin: contract` (the contract validator), `builtin: review` (a fresh, non-BLOCK review record must exist), `run:` (any command that exits 0 on pass), `requires_file:` (an artifact must exist).
+
+## Review panel — `trellis review`
+
+Turn "run a multi-persona review by hand" into a reproducible, gate-able artifact. Each **lens** is a shell command — Trellis calls no LLM directly, so it's provider-agnostic and **cross-model falls out of pointing different lenses at different model CLIs**:
+
+```yaml
+review: { parallelism: 4, timeout_s: 300 }
+lenses:
+  - name: static                                   # a deterministic lens — verdict from exit code
+    command: "ruff check . && mypy src"
+    deterministic: true
+  - name: correctness                              # an LLM lens on model A
+    command: "claude -p --model claude-sonnet-4"
+    persona: "Rigorous correctness reviewer. Trace every changed path."
+  - name: security                                 # an LLM lens on model B (cross-model)
+    command: "llm -m gpt-4o"
+    persona: "Security auditor. Hunt auth/secret/injection."
+```
+
+```bash
+trellis review --contract contracts/CONTRACT.md   # runs lenses in parallel → .trellis/review-record.json
+trellis gate critical --contract contracts/CONTRACT.md   # the `review` gate consumes it
+```
+
+Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **context hash** (prove which tree was reviewed), and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing, stale** (the contract changed since the review), or **BLOCKED** — so a review of an old version can't wave a change through.
 
 ## How this compares
 
@@ -98,9 +123,9 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 
 ## Roadmap
 
-- **v0.1 (this):** contract schema + linter, tier/gate ladder, CLI, GitHub Action, adapters. ✅
-- **v0.2:** `trellis review` — a pluggable, cross-model, deterministic-plus-LLM review panel that *produces* the `review-record.json` the `critical` tier requires (independent lenses, all-SIGN-rate metric to catch rubber-stamping).
-- **v0.3:** `trellis report` metrics (defect-escape proxy, gate outcomes), auto blast-radius classification from the diff, mutation-testing gate helper.
+- **v0.1:** contract schema + linter, tier/gate ladder, CLI, GitHub Action, adapters. ✅
+- **v0.2:** `trellis review` — pluggable, cross-model, deterministic-plus-LLM review panel producing the record the `review` gate enforces (fail-closed, freshness-pinned, rubber-stamp signal). ✅
+- **v0.3 (next):** `trellis report` metrics (defect-escape proxy, all-SIGN rate over time, gate outcomes), auto blast-radius classification from the diff, a mutation-testing gate helper, and direct-API lens providers as an optional extra.
 
 ## Adapters
 

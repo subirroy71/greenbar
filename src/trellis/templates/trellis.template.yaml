@@ -26,5 +26,27 @@ gates:
   lint:          { run: "ruff check ." }
   test:          { run: "pytest -q" }
   coverage:      { run: "pytest -q --cov --cov-fail-under=70" }
-  # The review runner is a v2 plugin; the GATE that a review record must exist is enforceable now:
-  review-record: { requires_file: ".trellis/review-record.json" }
+  # `builtin: review` requires a FRESH (matches this contract), non-BLOCK review record.
+  review:        { builtin: review, fail_on_rubber_stamp: true }
+
+# ── Review panel (`trellis review`) ──────────────────────────────────────────────
+# Each lens is a shell command that receives the prompt (persona + contract + diff) on stdin and
+# ends its reply with a JSON verdict: {"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}.
+# `deterministic: true` lenses (analyzers) derive the verdict from the exit code instead.
+# Cross-model = point different lenses at different model CLIs. A lens that times out / can't be
+# parsed is recorded as ERROR (fail-closed) — never a silent SIGN.
+review:
+  parallelism: 4
+  timeout_s: 300
+lenses:
+  # A deterministic lens: any check that exits 0 on pass (no LLM).
+  - name: static
+    command: "ruff check . && mypy src || true"   # replace with your analyzers
+    deterministic: true
+  # LLM lenses — wire your own agent CLI (claude / llm / aider / a script). Cross-model:
+  # - name: correctness
+  #   command: "claude -p --model claude-sonnet-4"
+  #   persona: "You are a rigorous correctness reviewer. Trace every changed path."
+  # - name: security
+  #   command: "llm -m gpt-4o"
+  #   persona: "You are a security auditor. Hunt for auth/secret/injection issues."
