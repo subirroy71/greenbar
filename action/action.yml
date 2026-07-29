@@ -1,0 +1,34 @@
+name: "Trellis Gate"
+description: "Run a Trellis tier's gates; fails the job (blocks merge) if any required gate fails."
+branding:
+  icon: "check-circle"
+  color: "green"
+inputs:
+  tier:
+    description: "Tier to run (must be defined in trellis.yaml)."
+    required: true
+  contract:
+    description: "Path to the contract for the builtin `contract` gate."
+    required: false
+    default: ""
+  version:
+    description: "trellis-loop version to install (default: latest)."
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: Install Trellis
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          pip install "trellis-loop==${{ inputs.version }}"
+        else
+          pip install trellis-loop
+        fi
+    - name: Run gates
+      shell: bash
+      run: |
+        ARGS=()
+        [ -n "${{ inputs.contract }}" ] && ARGS+=(--contract "${{ inputs.contract }}")
+        trellis gate "${{ inputs.tier }}" "${ARGS[@]}" -v

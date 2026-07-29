@@ -1,0 +1,30 @@
+# Trellis project policy — the axis catalog, the blast-radius tier ladder, and the gates.
+# This is your project's STANDING policy; a per-change contract declares against it.
+
+# ── Quality-axis catalog ───────────────────────────────────────────────────────
+# Which quality axes apply to each "profile". A profile is any dimension of work you review
+# along — e.g. C = a code/logic change, D = a data/surface change. Rename/extend freely; the
+# contract linter enforces that every axis of every profile a contract declares is accounted for.
+axes:
+  C: [correctness, reasonableness, performance]     # a code/logic change
+  D: [provenance, consistency, correctness, freshness]   # a data / user-facing surface
+
+# ── Tier ladder ────────────────────────────────────────────────────────────────
+# Blast-radius tiers: a change declares its tier; the tier fixes which gates are required.
+# Cheap changes run little; risky ones run everything. This is how rigor scales to impact.
+tiers:
+  trivial:  { gates: [contract] }
+  scoped:   { gates: [contract, lint, test] }
+  critical: { gates: [contract, lint, test, coverage, review-record] }
+
+# ── Gates ──────────────────────────────────────────────────────────────────────
+# builtin: contract  → Trellis's own contract validator
+# run: "<cmd>"        → any check that exits 0 on pass (swap these for your stack)
+# requires_file: <p>  → assert an artifact exists (e.g. a review-panel record)
+gates:
+  contract:      { builtin: contract }
+  lint:          { run: "ruff check ." }
+  test:          { run: "pytest -q" }
+  coverage:      { run: "pytest -q --cov --cov-fail-under=70" }
+  # The review runner is a v2 plugin; the GATE that a review record must exist is enforceable now:
+  review-record: { requires_file: ".trellis/review-record.json" }

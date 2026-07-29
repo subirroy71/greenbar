@@ -1,0 +1,9 @@
+# A minimal example project policy.
+axes:
+  C: [correctness, reasonableness]
+tiers:
+  trivial: { gates: [contract] }
+  scoped:  { gates: [contract, test] }
+gates:
+  contract: { builtin: contract }
+  test:     { run: "echo 'plug your test command here' && true" }

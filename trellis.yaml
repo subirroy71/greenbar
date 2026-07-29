@@ -1,0 +1,14 @@
+# Trellis's own policy — Trellis gates itself (dogfood). See contracts/CONTRACT.md.
+axes:
+  C: [correctness, reasonableness, performance]
+
+tiers:
+  trivial:  { gates: [contract] }
+  scoped:   { gates: [contract, test] }
+  critical: { gates: [contract, test, coverage, review-record] }
+
+gates:
+  contract:      { builtin: contract }
+  test:          { run: "pytest -q" }
+  coverage:      { run: "pytest -q --cov=trellis --cov-fail-under=70" }
+  review-record: { requires_file: ".trellis/review-record.json" }
