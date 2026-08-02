@@ -126,6 +126,14 @@ src/trellis/orient.py
   ...
 ```
 
+**Python works with zero deps** (stdlib `ast`). For **polyglot** reach (JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …), install the optional extra:
+
+```bash
+pip install "trellis-loop[treesitter]"       # adds a tree-sitter extractor; orient goes multi-language
+```
+
+Core stays dependency-light — without the extra, `orient` runs Python-only with no error; with it, `build_graph` dispatches each file to the right extractor by extension.
+
 It's an *approximate* map (name-based edges, like a repo map) — an advisory read-replica of the code, to be verified against the source. That's the same discipline a code knowledge graph uses; Trellis just makes it a one-command orientation step.
 
 ## Auto-tiering & metrics — `trellis classify` / `trellis report`
@@ -180,7 +188,8 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 - **v0.2:** `trellis review` — pluggable, cross-model, deterministic-plus-LLM review panel producing the record the `review` gate enforces (fail-closed, freshness-pinned, rubber-stamp signal). ✅
 - **v0.3:** `trellis classify` / `gate --auto` (auto blast-radius tiering from the diff) + `trellis report` (gate/review history metrics with honest proxies + rubber-stamp signal). ✅
 - **v0.4:** `trellis orient` — a token-bounded, diff-focusable code map (stdlib-`ast` symbol graph + personalized PageRank; pluggable extractor for other languages). ✅
-- **v0.5 (ideas):** tree-sitter extractor as an optional extra (multi-language orient), a persisted/cached graph, a mutation-testing gate helper, and a defect-escape metric wired to prod.
+- **v0.5:** polyglot `orient` — an optional `tree-sitter` extractor (`[treesitter]` extra) covering JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …; core stays dependency-light. ✅
+- **v0.6 (ideas):** a persisted/cached graph, a mutation-testing gate helper, a defect-escape metric wired to prod, and per-repo policy presets.
 
 ## Adapters
 

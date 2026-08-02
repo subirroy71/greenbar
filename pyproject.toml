@@ -15,6 +15,9 @@ dependencies = ["PyYAML>=6.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov", "ruff"]
+# Polyglot `trellis orient` (JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …).
+# Core stays dependency-light; this is opt-in: `pip install trellis-loop[treesitter]`.
+treesitter = ["tree-sitter-language-pack>=0.2"]
 
 [project.scripts]
 trellis = "trellis.cli:main"

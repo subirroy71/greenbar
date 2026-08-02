@@ -6,6 +6,13 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-02
+### Added
+- Polyglot `trellis orient` via an optional tree-sitter extractor (`pip install trellis-loop[treesitter]`)
+  covering JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, and more. `build_graph` dispatches each
+  file to the right extractor by extension; core stays dependency-light and orient runs Python-only when
+  the extra is absent. Unsupported files / parse failures are skipped, not fatal.
+
 ## [0.4.0] - 2026-08-02
 ### Added
 - `trellis orient` — a token-bounded, rank-ordered code map for agent orientation. Builds a

@@ -115,19 +115,35 @@ def _iter_source_files(root: Path, extensions: Tuple[str, ...], exclude: Iterabl
     return out
 
 
-def build_graph(root: str | Path, extractor: Optional[Extractor] = None,
+def default_extractors() -> List[Extractor]:
+    """Python (stdlib, always) + tree-sitter languages IF the optional extra is installed."""
+    exts: List[Extractor] = [PythonAstExtractor()]
+    try:
+        from .treesitter import treesitter_extractors
+        exts.extend(treesitter_extractors())
+    except Exception:  # noqa: BLE001 — extra absent / import issue → Python-only (A2)
+        pass
+    return exts
+
+
+def build_graph(root: str | Path, extractors: Optional[List[Extractor]] = None,
                 exclude: Iterable[str] = (".git", "__pycache__", ".venv", "venv", "build", "dist")) -> Graph:
-    extractor = extractor or PythonAstExtractor()
+    extractors = extractors or default_extractors()
+    # dispatch table: extension -> extractor (first registered wins; Python is first)
+    by_ext: Dict[str, Extractor] = {}
+    for ex in extractors:
+        for e in ex.extensions:
+            by_ext.setdefault(e, ex)
     root = Path(root)
     g = Graph()
     raw_refs: List[Tuple[str, str]] = []
-    for path in _iter_source_files(root, extractor.extensions, exclude):
+    for path in _iter_source_files(root, tuple(by_ext), exclude):
         rel = path.relative_to(root).as_posix()
         try:
             source = path.read_text(encoding="utf-8")
         except Exception:  # noqa: BLE001
             continue
-        symbols, refs = extractor.extract(rel, source)
+        symbols, refs = by_ext[path.suffix].extract(rel, source)  # A3: dispatch by extension
         for s in symbols:
             g.symbols[s.node_id] = s
             g.by_name.setdefault(s.name, []).append(s.node_id)
