@@ -109,6 +109,25 @@ trellis gate critical --contract contracts/CONTRACT.md   # the `review` gate con
 
 Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **context hash** (prove which tree was reviewed), and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing, stale** (the contract changed since the review), or **BLOCKED** — so a review of an old version can't wave a change through.
 
+## Orient before you edit — `trellis orient`
+
+Instead of reading 15k tokens of files to find where to look, build a symbol graph of the repo and emit a **token-bounded, rank-ordered code map** — and, focused on a diff, "what does *this* change touch and connect to." Dependency-light: Python via the stdlib `ast` module (no deps); other languages plug in via an optional extractor.
+
+```bash
+trellis orient --budget 1200                 # a repo map: top symbols by centrality, within a token budget
+trellis orient --diff-base main              # FOCUSED: bias the map toward the changed files (personalized PageRank)
+trellis orient --json                        # machine-readable, for feeding an agent
+```
+```
+# orientation for 1 changed file(s) · 143 symbols in graph
+src/trellis/orient.py
+  src/trellis/orient.py:130  def build_graph(root, extractor=None, exclude=(...))
+  src/trellis/orient.py:143  def pagerank(g, personalization=None, damping=0.85, iters=30)
+  ...
+```
+
+It's an *approximate* map (name-based edges, like a repo map) — an advisory read-replica of the code, to be verified against the source. That's the same discipline a code knowledge graph uses; Trellis just makes it a one-command orientation step.
+
 ## Auto-tiering & metrics — `trellis classify` / `trellis report`
 
 **Stop deciding the tier by hand.** Declare rules once; Trellis infers a change's blast radius from its diff (first match wins):
@@ -160,7 +179,8 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 - **v0.1:** contract schema + linter, tier/gate ladder, CLI, GitHub Action, adapters. ✅
 - **v0.2:** `trellis review` — pluggable, cross-model, deterministic-plus-LLM review panel producing the record the `review` gate enforces (fail-closed, freshness-pinned, rubber-stamp signal). ✅
 - **v0.3:** `trellis classify` / `gate --auto` (auto blast-radius tiering from the diff) + `trellis report` (gate/review history metrics with honest proxies + rubber-stamp signal). ✅
-- **v0.4 (ideas):** a mutation-testing gate helper, direct-API lens providers (optional extra), a defect-escape metric wired to prod, and per-repo policy presets.
+- **v0.4:** `trellis orient` — a token-bounded, diff-focusable code map (stdlib-`ast` symbol graph + personalized PageRank; pluggable extractor for other languages). ✅
+- **v0.5 (ideas):** tree-sitter extractor as an optional extra (multi-language orient), a persisted/cached graph, a mutation-testing gate helper, and a defect-escape metric wired to prod.
 
 ## Adapters
 

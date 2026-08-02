@@ -6,6 +6,13 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-02
+### Added
+- `trellis orient` — a token-bounded, rank-ordered code map for agent orientation. Builds a
+  symbol graph (Python via the stdlib `ast` module; pluggable extractor for other languages),
+  ranks with a personalized PageRank (biased toward the changed files when `--diff` is given),
+  and renders the top symbols within a token budget. Broken source files are skipped, not fatal.
+
 ## [0.3.0] - 2026-08-02
 ### Added
 - `trellis classify` — infer a change's tier from its diff (path globs + file/line thresholds,

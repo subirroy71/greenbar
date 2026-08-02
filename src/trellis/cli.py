@@ -139,6 +139,33 @@ def _cmd_report(args) -> int:
     return 0
 
 
+def _cmd_orient(args) -> int:
+    import json as _json
+
+    from .orient import build_graph, rank_symbols, render_map
+
+    g = build_graph(args.path or ".")
+    focus = None
+    if args.diff or args.diff_base:
+        focus = set(_resolve_diff_stat(args).files)
+    ranked = rank_symbols(g, focus_files=focus)
+    if args.json:
+        top = [
+            {"name": s.name, "kind": s.kind, "file": s.file, "line": s.line,
+             "signature": s.signature, "score": round(score, 6)}
+            for s, score in ranked[: args.top or 40]
+        ]
+        print(_json.dumps({"symbols": len(g.symbols), "focus_files": sorted(focus) if focus else [],
+                           "top": top}, indent=2))
+    else:
+        if focus:
+            print(f"# orientation for {len(focus)} changed file(s) · {len(g.symbols)} symbols in graph\n")
+        else:
+            print(f"# repo map · {len(g.symbols)} symbols\n")
+        print(render_map(ranked, budget_tokens=args.budget))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="trellis", description="Contract-first, gate-enforced development framework."
@@ -183,6 +210,15 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--out", default=".trellis/review-record.json", help="where to write the record")
     pr.add_argument("--config", help="path to trellis.yaml")
     pr.set_defaults(func=_cmd_review)
+
+    po = sub.add_parser("orient", help="emit a token-bounded code map (focus with --diff)")
+    po.add_argument("--path", help="repo root to map (default: .)")
+    po.add_argument("--diff", help="diff file — bias the map toward its changed files")
+    po.add_argument("--diff-base", help="git ref to diff against for the focus")
+    po.add_argument("--budget", type=int, default=1200, help="approx token budget for the map")
+    po.add_argument("--top", type=int, default=40, help="max symbols in --json output")
+    po.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    po.set_defaults(func=_cmd_orient)
     return p
 
 
