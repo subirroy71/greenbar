@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a capability or a new gate/lens/provider.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What can't you enforce or measure today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: How might it look? (a new gate kind, a `classify` condition, a CLI flag…)
+    validations:
+      required: true
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fits the design principles
+      options:
+        - label: Enforced, not advisory (a build failure, not a suggestion)
+        - label: Tool-agnostic (no coupling to one assistant or CI vendor)
+        - label: Dependency-light (no heavy runtime deps without strong justification)

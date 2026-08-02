@@ -1,0 +1,32 @@
+name: Bug report
+description: Something in Trellis doesn't work as documented.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you run and what went wrong?
+      placeholder: "`trellis gate scoped` exited 0 even though a gate failed…"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal `trellis.yaml` / contract + the exact command.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Trellis version
+      placeholder: "trellis --version"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.11"

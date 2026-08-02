@@ -1,0 +1,39 @@
+name: release
+
+# Publish to PyPI when a version tag is pushed:  git tag v0.3.0 && git push origin v0.3.0
+#
+# Uses PyPI **Trusted Publishing** (OIDC) — no API token/secret needed. One-time setup on PyPI:
+#   PyPI → your project → Publishing → add a GitHub publisher:
+#     owner=subirroy71, repo=trellis, workflow=release.yml, environment=pypi
+# (For the very first release, register the "pending publisher" before the project exists.)
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: trellis gate scoped --contract contracts/CONTRACT.md -v
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # OIDC — required for Trusted Publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install build
+      - run: python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
