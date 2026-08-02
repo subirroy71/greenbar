@@ -109,6 +109,40 @@ trellis gate critical --contract contracts/CONTRACT.md   # the `review` gate con
 
 Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **context hash** (prove which tree was reviewed), and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing, stale** (the contract changed since the review), or **BLOCKED** — so a review of an old version can't wave a change through.
 
+## Auto-tiering & metrics — `trellis classify` / `trellis report`
+
+**Stop deciding the tier by hand.** Declare rules once; Trellis infers a change's blast radius from its diff (first match wins):
+
+```yaml
+classify:
+  default: scoped
+  rules:
+    - { tier: critical, any_path: ["**/migrations/**", "**/auth/**", "**/*secret*"] }
+    - { tier: critical, min_files: 30 }
+    - { tier: trivial,  only_paths: ["**/*.md", "docs/**"] }
+    - { tier: trivial,  max_files: 1, max_lines: 10 }
+```
+
+```bash
+trellis classify                 # → tier: critical  (rule[0] matched {any_path: [**/migrations/**]})
+trellis gate --auto --contract contracts/CONTRACT.md   # classify, then run the inferred tier
+```
+
+So a docs typo runs the `trivial` gates and a migration change runs `critical` — rigor scales to impact automatically.
+
+**Measure whether the loop is paying.** Every `gate`/`review` appends to `.trellis/history.jsonl`; `trellis report` aggregates it:
+
+```
+$ trellis report
+gate runs:        42   pass rate: 88%   failures/gate: {test: 4, contract: 1}
+review runs:      18   verdicts: {PASS: 11, CHANGES: 6, BLOCKED: 1}
+  catch-rate*:    39%   rubber-stamp: 6%   avg findings: 1.7
+signals:
+  ⚠ over half of reviews were all-SIGN with zero findings — possible rubber-stamping
+```
+
+Proxies (defect-escape) are labelled as proxies — no overclaiming.
+
 ## How this compares
 
 | | Advisory doc / checklist | AI reviewer bot (post-PR) | **Trellis** |
@@ -125,7 +159,8 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 
 - **v0.1:** contract schema + linter, tier/gate ladder, CLI, GitHub Action, adapters. ✅
 - **v0.2:** `trellis review` — pluggable, cross-model, deterministic-plus-LLM review panel producing the record the `review` gate enforces (fail-closed, freshness-pinned, rubber-stamp signal). ✅
-- **v0.3 (next):** `trellis report` metrics (defect-escape proxy, all-SIGN rate over time, gate outcomes), auto blast-radius classification from the diff, a mutation-testing gate helper, and direct-API lens providers as an optional extra.
+- **v0.3:** `trellis classify` / `gate --auto` (auto blast-radius tiering from the diff) + `trellis report` (gate/review history metrics with honest proxies + rubber-stamp signal). ✅
+- **v0.4 (ideas):** a mutation-testing gate helper, direct-API lens providers (optional extra), a defect-escape metric wired to prod, and per-repo policy presets.
 
 ## Adapters
 

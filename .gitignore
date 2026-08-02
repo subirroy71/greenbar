@@ -9,3 +9,4 @@ venv/
 .coverage
 htmlcov/
 .trellis/review-record.json
+.trellis/history.jsonl

@@ -15,7 +15,19 @@ axes:
 tiers:
   trivial:  { gates: [contract] }
   scoped:   { gates: [contract, lint, test] }
-  critical: { gates: [contract, lint, test, coverage, review-record] }
+  critical: { gates: [contract, lint, test, coverage, review] }
+
+# ── Auto blast-radius classification (`trellis classify` / `trellis gate --auto`) ──
+# First matching rule wins; else `default`. A rule with no conditions never matches.
+# Conditions: any_path / only_paths (globs; **=any depth), min_files/max_files, min_lines/max_lines.
+classify:
+  default: scoped
+  rules:
+    - { tier: critical, any_path: ["**/migrations/**", "**/auth/**", "**/*secret*", "**/consent*"] }
+    - { tier: critical, min_files: 30 }
+    - { tier: critical, min_lines: 800 }
+    - { tier: trivial,  only_paths: ["**/*.md", "docs/**"] }
+    - { tier: trivial,  max_files: 1, max_lines: 10 }
 
 # ── Gates ──────────────────────────────────────────────────────────────────────
 # builtin: contract  → Trellis's own contract validator

@@ -23,3 +23,12 @@ lenses:
   - name: tests
     command: "pytest -q"
     deterministic: true
+
+# Trellis classifies its own changes: docs-only → trivial, big/core → critical, else scoped.
+classify:
+  default: scoped
+  rules:
+    - { tier: critical, any_path: ["src/trellis/gates.py", "src/trellis/contract.py"] }
+    - { tier: critical, min_files: 15 }
+    - { tier: trivial,  only_paths: ["**/*.md", "docs/**", "contracts/**"] }
+    - { tier: trivial,  max_files: 1, max_lines: 10 }

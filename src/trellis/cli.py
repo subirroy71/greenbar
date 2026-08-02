@@ -17,23 +17,32 @@ import subprocess
 from datetime import datetime, timezone
 
 from . import __version__
+from .classify import DiffStat, classify, git_numstat, parse_unified_diff
 from .config import load_config
 from .contract import load_contract, validate_contract
 from .gates import run_tier
+from .history import read_events, record_event
+from .report import aggregate, format_report
 from .review import run_review
 
 _TEMPLATES = Path(__file__).parent / "templates"
 
 
 def _resolve_diff(args) -> str:
-    if args.diff:
+    if getattr(args, "diff", None):
         return Path(args.diff).read_text()
-    base = args.diff_base or None
+    base = getattr(args, "diff_base", None)
     cmd = ["git", "diff", f"{base}...HEAD"] if base else ["git", "diff", "HEAD"]
     try:
         return subprocess.run(cmd, capture_output=True, text=True).stdout
     except Exception:  # noqa: BLE001 — no git / not a repo → empty diff
         return ""
+
+
+def _resolve_diff_stat(args) -> DiffStat:
+    if getattr(args, "diff", None):
+        return parse_unified_diff(Path(args.diff).read_text())
+    return git_numstat(getattr(args, "diff_base", None))
 
 
 def _cmd_init(args) -> int:
@@ -69,13 +78,21 @@ def _cmd_lint(args) -> int:
 
 def _cmd_gate(args) -> int:
     cfg = load_config(args.config)
-    results = run_tier(args.tier, cfg, args.contract)
+    tier = args.tier
+    if args.auto or tier is None:
+        tier, why = classify(_resolve_diff_stat(args), cfg.raw.get("classify") or {})
+        print(f"trellis: auto-classified tier = {tier}  ({why})")
+    results = run_tier(tier, cfg, args.contract)
     failed = [r for r in results if not r.ok]
     for r in results:
         print(f"[{'PASS' if r.ok else 'FAIL'}] {r.name}")
         if (args.verbose or not r.ok) and r.detail:
             print("\n".join("    " + line for line in r.detail.splitlines()))
-    print(f"\ntrellis gate '{args.tier}': {len(results) - len(failed)}/{len(results)} passed")
+    print(f"\ntrellis gate '{tier}': {len(results) - len(failed)}/{len(results)} passed")
+    record_event({
+        "kind": "gate", "tier": tier, "contract": args.contract, "ok": not failed,
+        "gates": [{"name": r.name, "ok": r.ok} for r in results],
+    })
     return 1 if failed else 0
 
 
@@ -94,7 +111,32 @@ def _cmd_review(args) -> int:
     m, s = rec["metrics"], rec["summary"]
     print(f"\ntrellis review: {s['verdict']} · {m['lens_count']} lenses · {m['finding_count']} findings"
           f"{' · ⚠ all-SIGN/zero-findings' if m['all_sign_no_findings'] else ''}  →  {args.out}")
+    record_event({
+        "kind": "review", "contract": args.contract, "verdict": s["verdict"],
+        "lens_count": m["lens_count"], "finding_count": m["finding_count"],
+        "all_sign_no_findings": m["all_sign_no_findings"],
+    })
     return 1 if s["verdict"] == "BLOCKED" else 0
+
+
+def _cmd_classify(args) -> int:
+    cfg = load_config(args.config)
+    stat = _resolve_diff_stat(args)
+    tier, why = classify(stat, cfg.raw.get("classify") or {})
+    print(f"tier: {tier}")
+    print(f"  files={len(stat.files)} lines={stat.total_lines} (+{stat.added}/-{stat.removed})")
+    print(f"  {why}")
+    return 0
+
+
+def _cmd_report(args) -> int:
+    import json as _json
+    agg = aggregate(read_events(args.history))
+    if args.json:
+        print(_json.dumps(agg, indent=2))
+    else:
+        print(format_report(agg))
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -114,11 +156,25 @@ def build_parser() -> argparse.ArgumentParser:
     pl.set_defaults(func=_cmd_lint)
 
     pg = sub.add_parser("gate", help="run a tier's gates")
-    pg.add_argument("tier")
+    pg.add_argument("tier", nargs="?", help="tier to run (omit with --auto to classify from the diff)")
+    pg.add_argument("--auto", action="store_true", help="infer the tier from the diff (classify)")
     pg.add_argument("--contract", help="contract for the builtin `contract` gate")
+    pg.add_argument("--diff", help="diff file for --auto (default: `git diff HEAD`)")
+    pg.add_argument("--diff-base", help="git ref to diff against for --auto")
     pg.add_argument("--config", help="path to trellis.yaml")
     pg.add_argument("-v", "--verbose", action="store_true", help="print detail for passing gates too")
     pg.set_defaults(func=_cmd_gate)
+
+    pc = sub.add_parser("classify", help="infer a change's tier from its diff")
+    pc.add_argument("--diff", help="diff file (default: `git diff HEAD`)")
+    pc.add_argument("--diff-base", help="git ref to diff against")
+    pc.add_argument("--config", help="path to trellis.yaml")
+    pc.set_defaults(func=_cmd_classify)
+
+    prep = sub.add_parser("report", help="aggregate the gate/review history")
+    prep.add_argument("--history", default=".trellis/history.jsonl")
+    prep.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    prep.set_defaults(func=_cmd_report)
 
     pr = sub.add_parser("review", help="run the configured lenses and write a review record")
     pr.add_argument("--contract", help="contract under review (its hash pins record freshness)")
