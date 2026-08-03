@@ -13,6 +13,8 @@ axes:
 # Blast-radius tiers: a change declares its tier; the tier fixes which gates are required.
 # Cheap changes run little; risky ones run everything. This is how rigor scales to impact.
 tiers:
+  # `design` runs BEFORE implementation — on the design doc, not the code.
+  design:   { gates: [contract, adr, design-review] }
   trivial:  { gates: [contract] }
   scoped:   { gates: [contract, lint, test] }
   critical: { gates: [contract, lint, test, coverage, review] }
@@ -40,6 +42,10 @@ gates:
   coverage:      { run: "pytest -q --cov --cov-fail-under=70" }
   # `builtin: review` requires a FRESH (matches this contract), non-BLOCK review record.
   review:        { builtin: review, fail_on_rubber_stamp: true }
+  # Design-phase gates: an ADR must exist + reference this design, and a design-review record
+  # (from the design-lens pack) must be present and non-BLOCK.
+  adr:           { builtin: adr, dir: "docs/adr", must_reference_contract: true }
+  design-review: { builtin: review, record: ".trellis/design-review.json", fail_on_rubber_stamp: true }
 
 # ── Review panel (`trellis review`) ──────────────────────────────────────────────
 # Each lens is a shell command that receives the prompt (persona + contract + diff) on stdin and
@@ -51,14 +57,29 @@ review:
   parallelism: 4
   timeout_s: 300
 lenses:
-  # A deterministic lens: any check that exits 0 on pass (no LLM).
-  - name: static
-    command: "ruff check . && mypy src || true"   # replace with your analyzers
+  # ── CODE lenses (group: code) — run on the diff via `trellis review` ──────────────
+  - name: static                                   # deterministic: exits 0 on pass (no LLM)
+    group: code
+    command: "ruff check . && mypy src || true"    # replace with your analyzers
     deterministic: true
-  # LLM lenses — wire your own agent CLI (claude / llm / aider / a script). Cross-model:
-  # - name: correctness
+  # - name: correctness                            # LLM lens on model A
+  #   group: code
   #   command: "claude -p --model claude-sonnet-4"
   #   persona: "You are a rigorous correctness reviewer. Trace every changed path."
-  # - name: security
+  # - name: security                               # LLM lens on model B (cross-model)
+  #   group: code
   #   command: "llm -m gpt-4o"
-  #   persona: "You are a security auditor. Hunt for auth/secret/injection issues."
+  #   persona: "You are a security auditor. Hunt auth/secret/injection."
+
+  # ── DESIGN lenses (group: design) — run on the design doc BEFORE code, via
+  #    `trellis review --group design --out .trellis/design-review.json` ─────────────
+  #    Wire each to your model CLI(s); cross-model is encouraged. `persona_file` loads the
+  #    discipline rubric from the pack `trellis init` dropped into ./lenses/.
+  # - { name: abstraction, group: design, command: "claude -p", persona_file: "lenses/design.abstraction.md" }
+  # - { name: invariants,  group: design, command: "llm -m gpt-4o", persona_file: "lenses/design.invariants.md" }
+  # - { name: simplicity,  group: design, command: "claude -p", persona_file: "lenses/design.simplicity.md" }
+  # - { name: evolution,   group: design, command: "llm -m gpt-4o", persona_file: "lenses/design.evolution.md" }
+  # - { name: domain,      group: design, command: "claude -p", persona_file: "lenses/design.domain.md" }
+  # Where a school has a FORMAL tool, prefer running it over a prompt — e.g. a deterministic
+  # invariants gate that model-checks a spec:
+  # - { name: tla, group: design, deterministic: true, command: "tlc -workers auto spec/Design.tla" }

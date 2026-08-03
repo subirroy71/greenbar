@@ -6,6 +6,16 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-03
+### Added
+- Architecture **design-lens pack**: five discipline lenses (abstraction-contracts, distributed-
+  invariants, systems-simplicity, evolutionary-design, domain-model) shipped as rubric files and
+  copied by `trellis init` into `lenses/`. Named by discipline, not by person.
+- Lenses gain `persona_file` (load a rubric from disk) and `group` (`trellis review --group design`
+  runs only that set) — enabling a design review distinct from the code review.
+- A `design` tier and a deterministic `builtin: adr` gate (an ADR must exist and, when configured,
+  reference the design's contract id). TLA+/model-checkers are a documented `run:` recipe, not core.
+
 ## [0.5.0] - 2026-08-02
 ### Added
 - Polyglot `trellis orient` via an optional tree-sitter extractor (`pip install trellis-loop[treesitter]`)

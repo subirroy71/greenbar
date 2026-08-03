@@ -60,6 +60,19 @@ def _cmd_init(args) -> int:
     if not example.exists():
         example.write_text((_TEMPLATES / "CONTRACT.template.md").read_text())
         print(f"trellis: wrote {example}")
+    # the architecture design-lens pack (referenced by the `design` tier in trellis.yaml)
+    src_lenses = _TEMPLATES / "lenses"
+    if src_lenses.exists():
+        ldir = dest / "lenses"
+        ldir.mkdir(exist_ok=True)
+        copied = 0
+        for f in sorted(src_lenses.glob("*.md")):
+            tgt = ldir / f.name
+            if not tgt.exists():
+                tgt.write_text(f.read_text())
+                copied += 1
+        if copied:
+            print(f"trellis: wrote {copied} design-lens rubric(s) into {ldir}/")
     print("next: edit the contract, then `trellis lint contracts/CONTRACT.example.md`")
     return 0
 
@@ -100,7 +113,7 @@ def _cmd_review(args) -> int:
     cfg = load_config(args.config)
     diff = _resolve_diff(args)
     now = datetime.now(timezone.utc).isoformat()
-    rec = run_review(args.contract, cfg.raw, diff, now=now, out_path=args.out)
+    rec = run_review(args.contract, cfg.raw, diff, now=now, out_path=args.out, group=args.group)
     for lens in rec["lenses"]:
         line = f"[{lens['verdict']:16}] {lens['name']}"
         if lens.get("error"):
@@ -208,6 +221,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--diff", help="path to a diff file (default: `git diff HEAD`)")
     pr.add_argument("--diff-base", help="git ref to diff against (`<base>...HEAD`)")
     pr.add_argument("--out", default=".trellis/review-record.json", help="where to write the record")
+    pr.add_argument("--group", help="only run lenses with this group (e.g. 'design')")
     pr.add_argument("--config", help="path to trellis.yaml")
     pr.set_defaults(func=_cmd_review)
 

@@ -73,11 +73,21 @@ class LensResult:
     raw_excerpt: str = ""
 
 
+def _persona_text(lens: dict) -> str:
+    persona = lens.get("persona")
+    if not persona and lens.get("persona_file"):
+        try:
+            from pathlib import Path as _P
+            persona = _P(lens["persona_file"]).read_text(encoding="utf-8")
+        except Exception:  # noqa: BLE001 — missing rubric file → generic reviewer, never a crash
+            persona = None
+    return persona or "You are a rigorous, independent reviewer."
+
+
 def build_prompt(lens: dict, contract_text: str, diff: str) -> str:
-    persona = lens.get("persona") or "You are a rigorous, independent code reviewer."
     return (
-        f"{persona}\n\n## Contract\n{contract_text or '(none)'}\n\n"
-        f"## Diff under review\n{diff or '(no diff provided)'}\n{_RETURN_CONTRACT}"
+        f"{_persona_text(lens)}\n\n## Contract\n{contract_text or '(none)'}\n\n"
+        f"## Change under review\n{diff or '(no diff provided)'}\n{_RETURN_CONTRACT}"
     )
 
 
@@ -143,13 +153,17 @@ def run_review(
     *,
     now: str,
     out_path: str = ".trellis/review-record.json",
+    group: Optional[str] = None,
     run_lens: Optional[Callable[[dict, str, str, float], LensResult]] = None,
 ) -> dict:
     """Run every configured lens (in parallel), synthesize, and persist the record.
 
+    ``group`` restricts to lenses whose ``group`` matches (e.g. "design"); None = all lenses.
     ``run_lens`` is injectable for testing; production uses :func:`run_command_lens`.
     """
     lenses = config.get("lenses") or []
+    if group is not None:
+        lenses = [l for l in lenses if l.get("group") == group]
     review = config.get("review") or {}
     timeout_s = float(review.get("timeout_s", 300))
     parallelism = int(review.get("parallelism", 4))

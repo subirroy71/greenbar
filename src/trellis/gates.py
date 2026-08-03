@@ -29,6 +29,32 @@ class GateResult:
     detail: str = ""
 
 
+def _check_adr(spec: dict, contract: Optional[str]) -> "GateResult":
+    """A deterministic design gate: an Architecture Decision Record must exist in ``dir`` and,
+    when ``must_reference_contract`` is set, mention the contract's id — so every design-tier
+    change leaves a decision trail. Degrades gracefully (clear failure, never a crash)."""
+    adr_dir = Path(spec.get("dir", "docs/adr"))
+    if not adr_dir.exists():
+        return GateResult("adr", False, f"no ADR directory: {adr_dir} (add one and record the decision)")
+    adrs = sorted(p for p in adr_dir.glob("**/*.md"))
+    if not adrs:
+        return GateResult("adr", False, f"no ADRs found under {adr_dir}")
+    if spec.get("must_reference_contract") and contract:
+        try:
+            from .contract import load_contract
+            meta, _ = load_contract(contract)
+            cid = str(meta.get("id", "")).strip()
+        except Exception:  # noqa: BLE001
+            cid = ""
+        if cid:
+            hits = [p.name for p in adrs if cid in p.read_text(encoding="utf-8", errors="ignore")]
+            if not hits:
+                return GateResult("adr", False,
+                                  f"no ADR under {adr_dir} references contract id {cid!r} — record the decision")
+            return GateResult("adr", True, f"ADR references {cid}: {', '.join(hits)}")
+    return GateResult("adr", True, f"{len(adrs)} ADR(s) present under {adr_dir}")
+
+
 def run_gate(name: str, spec: dict, cfg: TrellisConfig, contract: Optional[str]) -> GateResult:
     spec = spec or {}
     if spec.get("builtin") == "contract":
@@ -42,6 +68,9 @@ def run_gate(name: str, spec: dict, cfg: TrellisConfig, contract: Optional[str])
         errors = [x for x in findings if x.level == "error"]
         detail = "\n".join(f"    {x}" for x in findings) or "    ok"
         return GateResult(name, not errors, detail)
+
+    if spec.get("builtin") == "adr":
+        return _check_adr(spec, contract)
 
     if spec.get("builtin") == "review":
         record_path = spec.get("record", ".trellis/review-record.json")

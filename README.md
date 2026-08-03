@@ -109,6 +109,29 @@ trellis gate critical --contract contracts/CONTRACT.md   # the `review` gate con
 
 Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **context hash** (prove which tree was reviewed), and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing, stale** (the contract changed since the review), or **BLOCKED** — so a review of an old version can't wave a change through.
 
+## Design-phase review — an architecture lens pack
+
+Move the multi-lens review *earlier* — onto the design doc, before code. Trellis ships five **discipline** lenses (distilled from durable schools of software architecture — named by discipline, **not** impersonating people):
+
+| Lens | The question it forces |
+|---|---|
+| `abstraction` | Do the abstractions hold? Are contracts substitutable? Where does it leak? (Liskov / DbC) |
+| `invariants` | What safety/liveness invariants must hold under concurrency + failure — and can you prove them? (Lamport) |
+| `simplicity` | Least mechanism; do one thing well; is the common case simple + fast? (Lampson's *Hints*) |
+| `evolution` | YAGNI; reversibility; testable seams; the refactoring path if we're wrong (Fowler) |
+| `domain` | Does the model match the domain? Bounded contexts, aggregates, ubiquitous language? (Evans/DDD) |
+
+`trellis init` drops the rubrics into `lenses/`. Wire each to a model CLI (cross-model encouraged), then:
+
+```bash
+trellis review --group design --out .trellis/design-review.json --contract contracts/<id>.md
+trellis gate design --contract contracts/<id>.md      # gates: [contract, adr, design-review]
+```
+
+The `design` tier adds a deterministic **`builtin: adr` gate** — an Architecture Decision Record must exist *and reference this design* — so every design-tier change leaves a decision trail. And where a school has a **formal tool**, wire the tool, not a prompt: a `deterministic` lens that runs **TLA+** (`tlc spec/Design.tla`) is a truer "invariants" check than any persona.
+
+> The honest framing: the lenses give you the *breadth* of those schools' thinking; the ADR + TLA+ gates give *depth* where it exists; cross-model keeps it from being a mirror that agrees with itself.
+
 ## Orient before you edit — `trellis orient`
 
 Instead of reading 15k tokens of files to find where to look, build a symbol graph of the repo and emit a **token-bounded, rank-ordered code map** — and, focused on a diff, "what does *this* change touch and connect to." Dependency-light: Python via the stdlib `ast` module (no deps); other languages plug in via an optional extractor.
@@ -189,7 +212,8 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 - **v0.3:** `trellis classify` / `gate --auto` (auto blast-radius tiering from the diff) + `trellis report` (gate/review history metrics with honest proxies + rubber-stamp signal). ✅
 - **v0.4:** `trellis orient` — a token-bounded, diff-focusable code map (stdlib-`ast` symbol graph + personalized PageRank; pluggable extractor for other languages). ✅
 - **v0.5:** polyglot `orient` — an optional `tree-sitter` extractor (`[treesitter]` extra) covering JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …; core stays dependency-light. ✅
-- **v0.6 (ideas):** a persisted/cached graph, a mutation-testing gate helper, a defect-escape metric wired to prod, and per-repo policy presets.
+- **v0.6:** architecture design-lens pack — 5 discipline lenses (`persona_file` + `group`), a `design` tier, and a deterministic `builtin: adr` gate; design review runs before code. ✅
+- **v0.7 (ideas):** a persisted/cached orient graph, a mutation-testing gate helper, a defect-escape metric wired to prod, and per-repo policy presets.
 
 ## Adapters
 
