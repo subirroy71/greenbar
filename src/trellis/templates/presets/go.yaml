@@ -1,0 +1,31 @@
+# Trellis — Go preset. `trellis init --preset go`
+axes:
+  C: [correctness, reasonableness, performance]
+  D: [provenance, consistency, correctness, freshness]
+tiers:
+  design:   { gates: [contract, adr, design-review] }
+  trivial:  { gates: [contract] }
+  scoped:   { gates: [contract, vet, lint, test] }
+  critical: { gates: [contract, vet, lint, test, cover, review] }
+gates:
+  contract:      { builtin: contract }
+  vet:           { run: "go vet ./..." }
+  lint:          { run: "golangci-lint run" }
+  test:          { run: "go test ./..." }
+  cover:         { run: "go test -cover ./..." }
+  review:        { builtin: review, fail_on_rubber_stamp: true }
+  adr:           { builtin: adr, dir: "docs/adr", must_reference_contract: true }
+  design-review: { builtin: review, record: ".trellis/design-review.json", fail_on_rubber_stamp: true }
+classify:
+  default: scoped
+  rules:
+    - { tier: critical, any_path: ["**/migrations/**", "**/auth*", "**/*secret*", "**/security/**"] }
+    - { tier: critical, min_files: 30 }
+    - { tier: trivial,  only_paths: ["**/*.md", "docs/**"] }
+    - { tier: trivial,  max_files: 1, max_lines: 10 }
+review:
+  parallelism: 4
+  timeout_s: 300
+lenses:
+  - { name: static, group: code, command: "go vet ./... && golangci-lint run || true", deterministic: true }
+  # add LLM/cross-model code + design lenses (see the generic template / lenses/ pack)

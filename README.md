@@ -16,16 +16,21 @@ Most "AI dev workflows" (and most human ones) *generate* rigor — a nice spec, 
 
 The signature rule: **an asserted quality axis must carry a behavioral must-have KPI, or be explicitly deferred / marked n/a with a sign-off.** "We'll handle accuracy" is not a plan; a linter now says so.
 
-## Quickstart
+## Quickstart (≈5 minutes)
 
 ```bash
-pipx install trellis-loop          # or: pip install trellis-loop
+pipx install trellis-loop                 # or: pip install trellis-loop
 cd your-repo
-trellis init                       # writes trellis.yaml + contracts/CONTRACT.example.md
-$EDITOR contracts/CONTRACT.example.md
-trellis lint contracts/CONTRACT.example.md
-trellis gate scoped --contract contracts/CONTRACT.example.md
+trellis init --preset python              # gated for your stack in one command (python|node|go|rust)
+trellis draft docs/PRD.md                 # scaffold a lint-clean contract FROM your PRD (no blank page)
+$EDITOR contracts/<id>.md                 # fill the TODO targets
+trellis lint contracts/<id>.md
+trellis gate --auto --contract contracts/<id>.md   # classify the diff, run the right tier
 ```
+
+**`trellis draft`** turns a PRD/issue into a starting contract — pulling the goal, non-goals, and acceptance stubs out of the text and filling the quality axes from your project catalog, so you edit instead of stare at a blank frontmatter. It works with **no LLM** by default; `trellis draft PRD.md --with "claude -p"` uses a model CLI (provider-agnostic), falling back to the deterministic draft if that fails.
+
+**`trellis init --preset <stack>`** writes a `trellis.yaml` with your stack's gate commands (ruff/pytest, eslint/tsc, go vet/test, cargo clippy/test) + the tier ladder + the design-lens pack — no hand-written YAML to start.
 
 In CI (a change cannot merge unless its tier is green):
 
@@ -213,7 +218,8 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 - **v0.4:** `trellis orient` — a token-bounded, diff-focusable code map (stdlib-`ast` symbol graph + personalized PageRank; pluggable extractor for other languages). ✅
 - **v0.5:** polyglot `orient` — an optional `tree-sitter` extractor (`[treesitter]` extra) covering JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …; core stays dependency-light. ✅
 - **v0.6:** architecture design-lens pack — 5 discipline lenses (`persona_file` + `group`), a `design` tier, and a deterministic `builtin: adr` gate; design review runs before code. ✅
-- **v0.7 (ideas):** a persisted/cached orient graph, a mutation-testing gate helper, a defect-escape metric wired to prod, and per-repo policy presets.
+- **v0.7:** onboarding — `trellis draft` (contract from a PRD, deterministic or `--with` a model CLI) + `trellis init --preset python|node|go|rust` (stack-gated in one command). ✅
+- **v0.8 (ideas):** the accountability metric (defect-escape wired to prod/reverts), a PR-native GitHub App (rendered review comments + required check), an MCP server for agent-native use, and shareable policy packs.
 
 ## Adapters
 

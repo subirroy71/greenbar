@@ -26,7 +26,7 @@ trellis = "trellis.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-trellis = ["templates/*.yaml", "templates/*.md", "templates/adapters/**/*", "templates/lenses/*.md"]
+trellis = ["templates/*.yaml", "templates/*.md", "templates/adapters/**/*", "templates/lenses/*.md", "templates/presets/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

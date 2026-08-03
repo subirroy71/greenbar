@@ -6,6 +6,15 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-03
+### Added
+- `trellis draft <prd>` — scaffold a lint-clean contract from a PRD: pulls goal, non-goals, and
+  acceptance stubs from the text and fills the quality axes from the project catalog. Works with no
+  LLM by default; `--with "<cmd>"` drafts via any model CLI (provider-agnostic), falling back to the
+  deterministic draft on failure.
+- `trellis init --preset python|node|go|rust` — write a stack-gated trellis.yaml (ruff/pytest,
+  eslint/tsc, go vet/test, cargo clippy/test) in one command; unknown preset falls back to generic.
+
 ## [0.6.0] - 2026-08-03
 ### Added
 - Architecture **design-lens pack**: five discipline lenses (abstraction-contracts, distributed-

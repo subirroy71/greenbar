@@ -10,6 +10,7 @@ cannot merge unless its tier's gates are green.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -45,6 +46,10 @@ def _resolve_diff_stat(args) -> DiffStat:
     return git_numstat(getattr(args, "diff_base", None))
 
 
+def _slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "draft"
+
+
 def _cmd_init(args) -> int:
     dest = Path(args.path or ".")
     dest.mkdir(parents=True, exist_ok=True)
@@ -52,8 +57,15 @@ def _cmd_init(args) -> int:
     if cfg.exists():
         print(f"trellis: {cfg} already exists — leaving it")
     else:
-        cfg.write_text((_TEMPLATES / "trellis.template.yaml").read_text())
-        print(f"trellis: wrote {cfg}")
+        tmpl = _TEMPLATES / "trellis.template.yaml"
+        if getattr(args, "preset", None):
+            ptmpl = _TEMPLATES / "presets" / f"{args.preset}.yaml"
+            if ptmpl.exists():
+                tmpl = ptmpl
+            else:
+                print(f"trellis: no preset {args.preset!r} — using the generic template")
+        cfg.write_text(tmpl.read_text())
+        print(f"trellis: wrote {cfg}" + (f" (preset: {args.preset})" if getattr(args, "preset", None) and tmpl != _TEMPLATES / 'trellis.template.yaml' else ""))
     cdir = dest / "contracts"
     cdir.mkdir(exist_ok=True)
     example = cdir / "CONTRACT.example.md"
@@ -179,6 +191,38 @@ def _cmd_orient(args) -> int:
     return 0
 
 
+def _cmd_draft(args) -> int:
+    from .draft import build_contract, draft_with_command, parse_prd
+
+    prd_text = Path(args.prd).read_text()
+    cid = args.id or _slug(Path(args.prd).stem)
+    tier = args.tier
+    if tier is None:
+        try:
+            tier = (load_config(args.config).raw.get("classify") or {}).get("default", "scoped")
+        except Exception:  # noqa: BLE001
+            tier = "scoped"
+    out = Path(args.out or f"contracts/{cid}.md")
+
+    content = None
+    if args.with_cmd:
+        content = draft_with_command(args.with_cmd, prd_text, cid, tier)
+        if content is None:
+            print("trellis: --with command failed or returned no contract → deterministic draft")
+    if content is None:
+        try:
+            axes = load_config(args.config).axes or {"C": ["correctness", "reasonableness"]}
+        except Exception:  # noqa: BLE001
+            axes = {"C": ["correctness", "reasonableness"]}
+        content = build_contract(parse_prd(prd_text), cid, tier, axes, prd_body=prd_text)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(content)
+    print(f"trellis: wrote {out}")
+    print(f"next: fill the TODOs, then `trellis lint {out}`")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="trellis", description="Contract-first, gate-enforced development framework."
@@ -188,7 +232,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     pi = sub.add_parser("init", help="scaffold trellis.yaml + a contract template")
     pi.add_argument("path", nargs="?", help="target directory (default: .)")
+    pi.add_argument("--preset", help="stack preset for gates: python | node | go | rust")
     pi.set_defaults(func=_cmd_init)
+
+    pd = sub.add_parser("draft", help="scaffold a contract from a PRD")
+    pd.add_argument("prd", help="path to the PRD / issue markdown")
+    pd.add_argument("--id", help="contract id (default: slug of the PRD filename)")
+    pd.add_argument("--tier", help="tier (default: classify.default from trellis.yaml)")
+    pd.add_argument("--out", help="output path (default: contracts/<id>.md)")
+    pd.add_argument("--with", dest="with_cmd", help="model CLI to draft with (else deterministic)")
+    pd.add_argument("--config", help="path to trellis.yaml")
+    pd.set_defaults(func=_cmd_draft)
 
     pl = sub.add_parser("lint", help="validate a contract")
     pl.add_argument("contract")

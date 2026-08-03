@@ -1,0 +1,30 @@
+# Trellis — Rust preset. `trellis init --preset rust`
+axes:
+  C: [correctness, reasonableness, performance]
+  D: [provenance, consistency, correctness, freshness]
+tiers:
+  design:   { gates: [contract, adr, design-review] }
+  trivial:  { gates: [contract] }
+  scoped:   { gates: [contract, fmt, lint, test] }
+  critical: { gates: [contract, fmt, lint, test, review] }
+gates:
+  contract:      { builtin: contract }
+  fmt:           { run: "cargo fmt --check" }
+  lint:          { run: "cargo clippy -- -D warnings" }
+  test:          { run: "cargo test" }
+  review:        { builtin: review, fail_on_rubber_stamp: true }
+  adr:           { builtin: adr, dir: "docs/adr", must_reference_contract: true }
+  design-review: { builtin: review, record: ".trellis/design-review.json", fail_on_rubber_stamp: true }
+classify:
+  default: scoped
+  rules:
+    - { tier: critical, any_path: ["**/migrations/**", "**/auth*", "**/*secret*", "**/security/**"] }
+    - { tier: critical, min_files: 30 }
+    - { tier: trivial,  only_paths: ["**/*.md", "docs/**"] }
+    - { tier: trivial,  max_files: 1, max_lines: 10 }
+review:
+  parallelism: 4
+  timeout_s: 300
+lenses:
+  - { name: static, group: code, command: "cargo clippy -- -D warnings || true", deterministic: true }
+  # add LLM/cross-model code + design lenses (see the generic template / lenses/ pack)
