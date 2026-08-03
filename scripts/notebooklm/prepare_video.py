@@ -92,7 +92,7 @@ def collect_sources(repo: Path = REPO):
     return out
 
 
-def build_source_pack(repo: Path = REPO) -> str:
+def build_source_pack(repo: Path = REPO, extra=None) -> str:
     parts = [
         "# Trellis — project source pack (for a NotebookLM overview)",
         "",
@@ -103,7 +103,84 @@ def build_source_pack(repo: Path = REPO) -> str:
     ]
     for rel, why, text in collect_sources(repo):
         parts += [f"\n\n{'=' * 78}", f"## SOURCE: {rel}", f"_Why this matters: {why}_", f"{'=' * 78}\n", text]
+    for title, why, text in (extra or []):
+        parts += [f"\n\n{'=' * 78}", f"## SOURCE: {title}", f"_Why this matters: {why}_", f"{'=' * 78}\n", text]
     return "\n".join(parts)
+
+
+SAMPLE_PRD = """# Login throttle
+
+Rate-limit failed logins so credential-stuffing can't brute-force accounts.
+
+## Acceptance
+- must reject after 5 failed attempts within 60 seconds for the same account
+- must return HTTP 429 with a Retry-After header
+- must not lock out a user whose attempts are all successful
+
+## Out of scope
+- CAPTCHA, IP reputation
+"""
+
+
+def _display(cmd, repo: Path):
+    """Shorten absolute repo paths so the transcript reads cleanly."""
+    return [c.replace(str(repo) + "/", "./").replace(str(repo), ".") for c in cmd]
+
+
+def _run(cmd, cwd, stdin=None, limit=22):
+    import subprocess
+    try:
+        p = subprocess.run(cmd, cwd=str(cwd), input=stdin, capture_output=True, text=True, timeout=180)
+        out = ((p.stdout or "") + (p.stderr or "")).strip()
+    except Exception as exc:  # noqa: BLE001
+        out = f"[could not run: {exc}]"
+    lines = out.splitlines() or ["(no output)"]
+    if len(lines) > limit:
+        lines = lines[:limit] + [f"... ({len(lines) - limit} more lines)"]
+    return "\n".join(lines)
+
+
+def capture_cli_demo(repo: Path = REPO, trellis: str = "trellis") -> str:
+    """Run a real Trellis walkthrough and return it as a Markdown transcript.
+
+    A visual, in-action source for the video — every command and its output is real.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    blocks = [
+        "# Trellis — captured CLI session",
+        "",
+        "> Real commands and real output, so the overview can show the tool actually running "
+        "(these double as the 'screenshots' of the walkthrough).",
+    ]
+    tmp = Path(tempfile.mkdtemp(prefix="trellis-demo-"))
+    try:
+        subprocess.run(["git", "init", "-q", "."], cwd=str(tmp))
+        (tmp / "login-throttle.prd.md").write_text(SAMPLE_PRD, encoding="utf-8")
+        steps = [
+            ("Scaffold governance into a repo", [trellis, "init", "--preset", "python"], tmp, None),
+            ("Draft a contract from a PRD",
+             [trellis, "draft", "login-throttle.prd.md", "--id", "login-throttle"], tmp, None),
+            ("Validate the contract (machine-checked)",
+             [trellis, "lint", "contracts/login-throttle.md"], tmp, None),
+            ("Map the code — orient",
+             [trellis, "orient", "--path", str(repo / "src" / "trellis"), "--budget", "350"], repo, None),
+            ("Agent-native — list the MCP tools", [trellis, "mcp"], repo,
+             '{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n'),
+        ]
+        # NOTE: no live `trellis gate` step — the scoped gate runs the test suite, and this capture
+        # is itself exercised by a test, so running it here would recurse. Gates are narrated in the
+        # prompt + beat sheet instead. The GIF tape (demo.tape) shows a live gate in a scratch dir.
+        for title, cmd, cwd, stdin in steps:
+            shown = " ".join(_display(cmd, repo))
+            if stdin:
+                shown = "echo '<jsonrpc>' | " + shown
+            blocks.append(f"\n## {title}\n\n```console\n$ {shown}\n{_run(cmd, cwd, stdin)}\n```")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "\n".join(blocks)
 
 
 def build_prompt(audience: str, fmt: str, minutes: int, tone: str) -> str:
@@ -174,9 +251,16 @@ def build_steps(audience: str, fmt: str, minutes: int, out_dir: Path) -> str:
     ])
 
 
-def prepare(audience: str, fmt: str, minutes: int, tone: str, out_dir: Path, repo: Path = REPO):
+def prepare(audience: str, fmt: str, minutes: int, tone: str, out_dir: Path,
+            repo: Path = REPO, with_demo: bool = False):
     out_dir.mkdir(parents=True, exist_ok=True)
-    pack = build_source_pack(repo)
+    extra = []
+    if with_demo:
+        demo = capture_cli_demo(repo)
+        (out_dir / "cli-demo.md").write_text(demo + "\n", encoding="utf-8")
+        extra.append(("CLI demo (captured session)",
+                      "Shows the tool actually running — concrete commands + output for the video.", demo))
+    pack = build_source_pack(repo, extra=extra)
     prompt = build_prompt(audience, fmt, minutes, tone)
     steps = build_steps(audience, fmt, minutes, out_dir)
     (out_dir / "source-pack.md").write_text(pack, encoding="utf-8")
@@ -191,14 +275,18 @@ def main(argv=None) -> int:
     ap.add_argument("--format", dest="fmt", choices=["video", "audio"], default="video")
     ap.add_argument("--minutes", type=int, default=4)
     ap.add_argument("--tone", choices=sorted(TONES), default="energetic")
+    ap.add_argument("--with-demo", action="store_true",
+                    help="run a live Trellis walkthrough and add the captured session as a source")
     ap.add_argument("--out-dir", default=str(REPO / "build" / "notebooklm"))
     args = ap.parse_args(argv)
 
     out_dir = Path(args.out_dir)
-    pack, prompt, _ = prepare(args.audience, args.fmt, args.minutes, args.tone, out_dir, REPO)
-    n_sources = len(collect_sources(REPO))
+    pack, prompt, _ = prepare(args.audience, args.fmt, args.minutes, args.tone, out_dir, REPO,
+                              with_demo=args.with_demo)
+    n_sources = len(collect_sources(REPO)) + (1 if args.with_demo else 0)
     print(f"Prepared NotebookLM inputs in {out_dir}/")
-    print(f"  source-pack.md  ({n_sources} sources, {len(pack.splitlines())} lines)")
+    print(f"  source-pack.md  ({n_sources} sources, {len(pack.splitlines())} lines)"
+          + ("  [+ captured CLI demo]" if args.with_demo else ""))
     print("  prompt.txt      (paste into NotebookLM 'Customize')")
     print("  STEPS.md        (upload + generate steps + narration beat sheet)")
     print("\n--- steering prompt preview ---\n")

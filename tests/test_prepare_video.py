@@ -31,6 +31,20 @@ def test_prepare_writes_three_artifacts(tmp_path):
     assert "notebooklm.google.com" in steps and "beat sheet" in steps.lower()
 
 
+def test_capture_cli_demo_runs_real_commands():
+    demo = pv.capture_cli_demo()
+    # every step header present, and real output for at least the read-only ones
+    assert "orient" in demo and "MCP tools" in demo
+    assert "```console" in demo and "trellis_orient" in demo  # a real MCP tools/list response
+
+
+def test_with_demo_adds_a_source(tmp_path):
+    out = tmp_path / "nb"
+    pack, _, _ = pv.prepare("developers", "video", 4, "energetic", out, with_demo=True)
+    assert (out / "cli-demo.md").exists()
+    assert "captured session" in pack.lower()
+
+
 def test_cli_runs(capsys):
     assert pv.main(["--audience", "eng-leaders", "--minutes", "3", "--out-dir",
                     str(Path(pv.REPO) / "build" / "notebooklm-test")]) == 0
