@@ -46,6 +46,37 @@ def _resolve_diff_stat(args) -> DiffStat:
     return git_numstat(getattr(args, "diff_base", None))
 
 
+def _git_head() -> Optional[str]:
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
+        return out.stdout.strip() or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _git_commits(limit: int = 2000):
+    """Return [Commit(...)] from git log (sha, commit-time, subject, body); [] if not a git repo."""
+    from .accountability import Commit
+    fmt = "%H%x1f%ct%x1f%s%x1f%b"
+    try:
+        out = subprocess.run(
+            ["git", "log", f"-n{limit}", "-z", f"--format={fmt}"], capture_output=True, text=True
+        )
+    except Exception:  # noqa: BLE001
+        return []
+    commits = []
+    for rec in out.stdout.split("\x00"):
+        if not rec.strip():
+            continue
+        parts = rec.split("\x1f")
+        if len(parts) >= 4:
+            try:
+                commits.append(Commit(parts[0], int(parts[1]), parts[2], parts[3]))
+            except ValueError:
+                continue
+    return commits
+
+
 def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-") or "draft"
 
@@ -116,6 +147,7 @@ def _cmd_gate(args) -> int:
     print(f"\ntrellis gate '{tier}': {len(results) - len(failed)}/{len(results)} passed")
     record_event({
         "kind": "gate", "tier": tier, "contract": args.contract, "ok": not failed,
+        "commit": _git_head(),   # links a later revert of this commit back to its gate result
         "gates": [{"name": r.name, "ok": r.ok} for r in results],
     })
     return 1 if failed else 0
@@ -161,6 +193,25 @@ def _cmd_report(args) -> int:
         print(_json.dumps(agg, indent=2))
     else:
         print(format_report(agg))
+    return 0
+
+
+def _cmd_accountability(args) -> int:
+    import json as _json
+    from dataclasses import asdict
+
+    from .accountability import compute, format_report
+
+    incidents = None
+    if args.incidents:
+        incidents = [l.strip().split()[0] for l in Path(args.incidents).read_text().splitlines()
+                     if l.strip() and not l.strip().startswith("#")]
+    rep = compute(read_events(args.history), _git_commits(), incidents=incidents,
+                  window_days=args.window_days)
+    if args.json:
+        print(_json.dumps(asdict(rep), indent=2))
+    else:
+        print(format_report(rep))
     return 0
 
 
@@ -269,6 +320,13 @@ def build_parser() -> argparse.ArgumentParser:
     prep.add_argument("--history", default=".trellis/history.jsonl")
     prep.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     prep.set_defaults(func=_cmd_report)
+
+    pa = sub.add_parser("accountability", help="defect-escape rate: gate-passed changes later reverted")
+    pa.add_argument("--history", default=".trellis/history.jsonl")
+    pa.add_argument("--incidents", help="file of commit SHAs (one per line) known to be defective")
+    pa.add_argument("--window-days", type=float, help="only attribute a revert within N days of merge")
+    pa.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    pa.set_defaults(func=_cmd_accountability)
 
     pr = sub.add_parser("review", help="run the configured lenses and write a review record")
     pr.add_argument("--contract", help="contract under review (its hash pins record freshness)")

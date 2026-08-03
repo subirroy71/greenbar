@@ -6,6 +6,14 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-03
+### Added
+- `trellis accountability` — the loop's payoff, measured: `gate` now stamps the commit SHA on its
+  history event, and this command reads git for reverts, links each to the reverted commit, and
+  reports the **defect-escape rate** (gate-passed changes later reverted / all gated changes) plus
+  mean time-to-revert. `--incidents <sha-file>` folds in incident-linked commits. Reverts are an
+  honestly-labelled proxy; commits Trellis never gated are reported as 'ungoverned', not escapes.
+
 ## [0.7.0] - 2026-08-03
 ### Added
 - `trellis draft <prd>` — scaffold a lint-clean contract from a PRD: pulls goal, non-goals, and
