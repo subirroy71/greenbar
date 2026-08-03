@@ -6,6 +6,15 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-03
+### Added
+- `trellis render` — turn the latest gate event + review record(s) into a Markdown PR summary
+  (gate table, review verdicts + findings, rubber-stamp flag) with a stable marker for one-comment
+  upsert. CLI renders; the Action posts.
+- A shipped GitHub workflow (`templates/github/trellis-pr.yml`) that runs `trellis gate --auto` as a
+  required check (blocks merge) and upserts a single PR comment using the repo's GITHUB_TOKEN — a
+  PR-native experience with no hosted service.
+
 ## [0.8.0] - 2026-08-03
 ### Added
 - `trellis accountability` — the loop's payoff, measured: `gate` now stamps the commit SHA on its

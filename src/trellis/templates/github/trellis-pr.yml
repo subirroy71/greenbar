@@ -1,0 +1,70 @@
+# Trellis — PR-native check + comment. Copy to .github/workflows/trellis-pr.yml
+# Runs the gate as a REQUIRED check (blocks merge on failure) and upserts ONE PR comment.
+# No hosted service — just the repo's GITHUB_TOKEN.
+name: trellis-pr
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: write   # to post/update the comment
+
+jobs:
+  trellis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }          # full history so classify/accountability can diff
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install trellis-loop
+
+      - name: Resolve the PR's contract
+        id: c
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          # the contract this PR added/changed; else the newest one
+          CONTRACT=$(git diff --name-only "$BASE"...HEAD -- 'contracts/*.md' | head -1)
+          [ -z "$CONTRACT" ] && CONTRACT=$(ls -t contracts/*.md 2>/dev/null | head -1)
+          echo "contract=$CONTRACT" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+
+      # Optional: run the review panel here (wire your model CLIs + secrets in trellis.yaml lenses).
+      - name: Review
+        continue-on-error: true
+        run: |
+          [ -n "${{ steps.c.outputs.contract }}" ] && \
+            trellis review --contract "${{ steps.c.outputs.contract }}" --diff-base "${{ steps.c.outputs.base }}" || true
+
+      - name: Gate (required check)
+        id: gate
+        continue-on-error: true            # let the comment post even on failure; we fail at the end
+        run: |
+          trellis gate --auto --diff-base "${{ steps.c.outputs.base }}" \
+            ${{ steps.c.outputs.contract && format('--contract {0}', steps.c.outputs.contract) || '' }} -v
+
+      - name: Render comment
+        run: trellis render --out .trellis/pr-comment.md || echo "## 🌿 Trellis\n_render failed_\n<!-- trellis-report -->" > .trellis/pr-comment.md
+
+      - name: Upsert PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- trellis-report -->';
+            let body = 'Trellis: no report';
+            try { body = fs.readFileSync('.trellis/pr-comment.md', 'utf8'); } catch (e) {}
+            const { data: comments } = await github.rest.issues.listComments(
+              { ...context.repo, issue_number: context.issue.number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment(
+                { ...context.repo, issue_number: context.issue.number, body });
+            }
+
+      - name: Enforce gate result
+        if: steps.gate.outcome != 'success'
+        run: |
+          echo "Trellis gate failed — this check blocks merge."
+          exit 1

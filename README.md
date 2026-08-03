@@ -42,6 +42,23 @@ In CI (a change cannot merge unless its tier is green):
     contract: contracts/CONTRACT.md
 ```
 
+### PR-native — a required check + one comment (no hosted service)
+
+Drop in the shipped workflow (`src/trellis/templates/github/trellis-pr.yml` → `.github/workflows/`). On every PR it runs `trellis gate --auto` as a **required check that blocks merge**, then upserts **one** comment (never spams) with the gate table + review findings — using only the repo's `GITHUB_TOKEN`:
+
+```markdown
+## 🌿 Trellis
+**Gate `critical`: ✅ pass**
+| gate | result |  |
+|---|---|
+| `contract` | ✅ | `test` ✅ · `coverage` ✅ · `review` ✅ |
+**Code review: 🔸 CHANGES** · 3 lenses · 2 findings
+- 🔸 _security_ — rate limit is per-username; also consider per-IP
+- 🔸 _abstraction_ — the Store interface leaks ordering
+```
+
+`trellis render` produces that Markdown from the local artifacts (CLI renders; the Action posts) — so a hosted GitHub App is unnecessary.
+
 ## What a contract looks like
 
 ```yaml
@@ -219,7 +236,9 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 - **v0.5:** polyglot `orient` — an optional `tree-sitter` extractor (`[treesitter]` extra) covering JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …; core stays dependency-light. ✅
 - **v0.6:** architecture design-lens pack — 5 discipline lenses (`persona_file` + `group`), a `design` tier, and a deterministic `builtin: adr` gate; design review runs before code. ✅
 - **v0.7:** onboarding — `trellis draft` (contract from a PRD, deterministic or `--with` a model CLI) + `trellis init --preset python|node|go|rust` (stack-gated in one command). ✅
-- **v0.8 (ideas):** the accountability metric (defect-escape wired to prod/reverts), a PR-native GitHub App (rendered review comments + required check), an MCP server for agent-native use, and shareable policy packs.
+- **v0.8:** `trellis accountability` — defect-escape rate (gate-passed changes later reverted), the "does the loop pay?" metric, honest by construction. ✅
+- **v0.9:** PR-native — `trellis render` + a shipped GitHub workflow: a required gate check that blocks merge and one upserted PR comment (gate table + review findings), no hosted service. ✅
+- **v0.10 (ideas):** an MCP server for agent-native use (orient/lint/gate/review as tools) and shareable policy packs (`soc2`, `fintech`, …).
 
 ## Adapters
 

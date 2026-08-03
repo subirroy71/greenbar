@@ -196,6 +196,37 @@ def _cmd_report(args) -> int:
     return 0
 
 
+def _cmd_render(args) -> int:
+    import json as _json
+
+    from .render import render_pr_comment
+
+    events = read_events(args.history)
+    gate_event = next((e for e in reversed(events) if e.get("kind") == "gate"), None)
+
+    paths = list(args.review or [])
+    if not paths:
+        for default in (".trellis/review-record.json", ".trellis/design-review.json"):
+            if Path(default).exists():
+                paths.append(default)
+    reviews = []
+    for p in paths:
+        label = "Design review" if "design" in Path(p).name else "Code review"
+        try:
+            reviews.append((label, _json.loads(Path(p).read_text())))
+        except Exception:  # noqa: BLE001
+            pass
+
+    md = render_pr_comment(gate_event, reviews)
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(md)
+        print(f"trellis: wrote {args.out}")
+    else:
+        print(md)
+    return 0
+
+
 def _cmd_accountability(args) -> int:
     import json as _json
     from dataclasses import asdict
@@ -320,6 +351,12 @@ def build_parser() -> argparse.ArgumentParser:
     prep.add_argument("--history", default=".trellis/history.jsonl")
     prep.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     prep.set_defaults(func=_cmd_report)
+
+    prn = sub.add_parser("render", help="render the latest gate + review artifacts as a Markdown PR comment")
+    prn.add_argument("--history", default=".trellis/history.jsonl")
+    prn.add_argument("--review", action="append", help="review record json (repeatable; default: auto-detect)")
+    prn.add_argument("--out", help="write to a file instead of stdout")
+    prn.set_defaults(func=_cmd_render)
 
     pa = sub.add_parser("accountability", help="defect-escape rate: gate-passed changes later reverted")
     pa.add_argument("--history", default=".trellis/history.jsonl")
