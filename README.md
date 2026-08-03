@@ -59,6 +59,22 @@ Drop in the shipped workflow (`src/trellis/templates/github/trellis-pr.yml` → 
 
 `trellis render` produces that Markdown from the local artifacts (CLI renders; the Action posts) — so a hosted GitHub App is unnecessary.
 
+### Agent-native — an MCP server (no SDK dependency)
+
+`trellis mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdio, so any coding agent can call Trellis as first-class tools mid-task — `trellis_orient` (map the code), `trellis_lint` (check a contract), `trellis_classify` (tier a change), `trellis_draft` (contract from a PRD), `trellis_gate`, `trellis_report`. It's implemented in pure stdlib (newline-delimited JSON-RPC 2.0) — no MCP SDK in core.
+
+```bash
+# Claude Code
+claude mcp add trellis -- trellis mcp
+```
+
+```jsonc
+// Cursor — .cursor/mcp.json  (or any MCP client)
+{ "mcpServers": { "trellis": { "command": "trellis", "args": ["mcp"] } } }
+```
+
+Now the agent orients, drafts, and gates through the same governed loop a human does — the framework travels into the agent instead of sitting beside it.
+
 ## What a contract looks like
 
 ```yaml
@@ -238,7 +254,8 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 - **v0.7:** onboarding — `trellis draft` (contract from a PRD, deterministic or `--with` a model CLI) + `trellis init --preset python|node|go|rust` (stack-gated in one command). ✅
 - **v0.8:** `trellis accountability` — defect-escape rate (gate-passed changes later reverted), the "does the loop pay?" metric, honest by construction. ✅
 - **v0.9:** PR-native — `trellis render` + a shipped GitHub workflow: a required gate check that blocks merge and one upserted PR comment (gate table + review findings), no hosted service. ✅
-- **v0.10 (ideas):** an MCP server for agent-native use (orient/lint/gate/review as tools) and shareable policy packs (`soc2`, `fintech`, …).
+- **v0.10:** agent-native — `trellis mcp`, a pure-stdlib MCP server exposing orient/lint/classify/draft/gate/report as tools any coding agent (Claude Code, Cursor) can call. ✅
+- **v0.11 (ideas):** shareable policy packs (`soc2`, `fintech`, `oss-maintainer`) and a first PyPI release.
 
 ## Adapters
 

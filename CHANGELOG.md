@@ -6,6 +6,15 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-03
+### Added
+- `trellis mcp` — a minimal MCP (Model Context Protocol) server over stdio, in pure stdlib
+  (newline-delimited JSON-RPC 2.0, no SDK dependency), exposing `trellis_orient`, `trellis_lint`,
+  `trellis_classify`, `trellis_draft`, `trellis_gate`, and `trellis_report` as tools any coding
+  agent (Claude Code, Cursor) can call mid-task. Handles initialize / tools/list / tools/call /
+  ping; tool errors, unknown tools/methods, and malformed lines all degrade in-band without
+  crashing the loop.
+
 ## [0.9.0] - 2026-08-03
 ### Added
 - `trellis render` — turn the latest gate event + review record(s) into a Markdown PR summary

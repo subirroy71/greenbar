@@ -382,7 +382,15 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--top", type=int, default=40, help="max symbols in --json output")
     po.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     po.set_defaults(func=_cmd_orient)
+
+    pm = sub.add_parser("mcp", help="run the MCP server over stdio (agent-native)")
+    pm.set_defaults(func=_cmd_mcp)
     return p
+
+
+def _cmd_mcp(args) -> int:
+    from .mcp_server import serve
+    return serve()
 
 
 def main(argv=None) -> int:
