@@ -4,14 +4,33 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trellis-loop"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Contract-first, gate-enforced development framework — turn best-practices into CI gates."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Subir Roy" }]
-keywords = ["ci", "governance", "spec-driven", "quality-gates", "ai-assisted-development", "tdd"]
+keywords = ["ci", "governance", "spec-driven", "quality-gates", "ai-assisted-development", "tdd", "mcp"]
 dependencies = ["PyYAML>=6.0"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+
+[project.urls]
+Homepage = "https://github.com/subirroy71/trellis"
+Repository = "https://github.com/subirroy71/trellis"
+Changelog = "https://github.com/subirroy71/trellis/blob/main/CHANGELOG.md"
+Issues = "https://github.com/subirroy71/trellis/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov", "ruff"]
@@ -21,6 +40,9 @@ treesitter = ["tree-sitter-language-pack>=0.2"]
 
 [project.scripts]
 trellis = "trellis.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "trellis.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

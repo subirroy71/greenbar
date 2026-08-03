@@ -15,6 +15,13 @@ All notable changes to Trellis are documented here. The format follows
   ping; tool errors, unknown tools/methods, and malformed lines all degrade in-band without
   crashing the loop.
 
+### Changed
+- Packaging: first PyPI-ready release. Version is now single-sourced from `trellis.__version__`
+  (pyproject reads it dynamically); `requires-python` is honestly `>=3.10` (the code uses PEP 604
+  `X | Y` in evaluated signatures — 3.9 is EOL and now refused by metadata, not silently broken);
+  added PyPI classifiers + project URLs. The release workflow tests on 3.10–3.13, `twine check`s
+  the artifacts, guards tag==version, and publishes via OIDC trusted publishing (no stored token).
+
 ## [0.9.0] - 2026-08-03
 ### Added
 - `trellis render` — turn the latest gate event + review record(s) into a Markdown PR summary

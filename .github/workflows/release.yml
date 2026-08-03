@@ -12,28 +12,52 @@ on:
     tags: ["v*"]
 
 jobs:
-  test:
+  test:  # verifies the requires-python >=3.10 claim on every supported interpreter
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - run: trellis gate scoped --contract contracts/CONTRACT.md -v  # dogfood: the tool gates its own release
+
+  build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - run: pip install -e ".[dev]"
-      - run: trellis gate scoped --contract contracts/CONTRACT.md -v
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - name: Tag must match package version
+        run: |
+          PKG=$(grep -oE '__version__ = "([^"]+)"' src/trellis/__init__.py | cut -d'"' -f2)
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "package=$PKG tag=$TAG"
+          [ "$PKG" = "$TAG" ] || { echo "::error::tag v$TAG does not match package version $PKG"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
   publish:
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write   # OIDC — required for Trusted Publishing
+      id-token: write   # OIDC — required for Trusted Publishing (no API token in the repo)
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/download-artifact@v4
         with:
-          python-version: "3.11"
-      - run: pip install build
-      - run: python -m build
+          name: dist
+          path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

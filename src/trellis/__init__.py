@@ -8,6 +8,6 @@ contract validates and its tier's gates are green.
 Public API is intentionally small — see `trellis.contract`, `trellis.config`, `trellis.gates`.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.10.0"
 # Rename the tool here (and in pyproject.toml [project.name] + the console-script) to rebrand.
 TOOL_NAME = "trellis"
