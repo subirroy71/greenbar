@@ -1,0 +1,6 @@
+# Policy and enforcement files need a deliberate review from the maintainer.
+# (Greenbar runs gates with the base branch's greenbar.yaml, so a PR can't loosen its own check —
+# this makes sure policy changes themselves get a human look.)
+greenbar.yaml          @subirroy71
+.github/               @subirroy71
+src/greenbar/templates/ @subirroy71
