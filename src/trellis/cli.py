@@ -46,7 +46,7 @@ def _resolve_diff_stat(args) -> DiffStat:
     return git_numstat(getattr(args, "diff_base", None))
 
 
-def _git_head() -> Optional[str]:
+def _git_head() -> str | None:
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
         return out.stdout.strip() or None

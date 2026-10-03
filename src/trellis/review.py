@@ -17,7 +17,7 @@ import json
 import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 VERDICTS = {"SIGN", "SIGN_WITH_CHANGE", "BLOCK", "ERROR"}
 _BLOCKING = {"BLOCK", "ERROR"}

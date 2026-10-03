@@ -255,7 +255,7 @@ Trellis isn't a code reviewer — it's the layer that guarantees the reviewer, t
 - **v0.8:** `trellis accountability` — defect-escape rate (gate-passed changes later reverted), the "does the loop pay?" metric, honest by construction. ✅
 - **v0.9:** PR-native — `trellis render` + a shipped GitHub workflow: a required gate check that blocks merge and one upserted PR comment (gate table + review findings), no hosted service. ✅
 - **v0.10:** agent-native — `trellis mcp`, a pure-stdlib MCP server exposing orient/lint/classify/draft/gate/report as tools any coding agent (Claude Code, Cursor) can call. ✅
-- **v0.11 (ideas):** shareable policy packs (`soc2`, `fintech`, `oss-maintainer`) and a first PyPI release.
+- **v0.11 (ideas):** shareable policy packs (`soc2`, `fintech`, `oss-maintainer`).
 
 ## Adapters
 

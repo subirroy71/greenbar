@@ -1,5 +1,4 @@
 """v0.7 — `trellis draft` (PRD → lint-clean contract) + stack presets."""
-from pathlib import Path
 
 from trellis.cli import main
 from trellis.contract import parse_contract, validate_contract

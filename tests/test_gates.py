@@ -1,5 +1,4 @@
 """Gate ladder — the three gate kinds + tier aggregation, against a temp project."""
-from pathlib import Path
 
 import pytest
 

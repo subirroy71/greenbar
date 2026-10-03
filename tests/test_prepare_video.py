@@ -1,5 +1,7 @@
 """The NotebookLM video-prep script assembles a source pack + steering prompt."""
 import importlib.util
+import shutil
+import sys
 from pathlib import Path
 
 _SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "notebooklm" / "prepare_video.py"
@@ -32,7 +34,9 @@ def test_prepare_writes_three_artifacts(tmp_path):
 
 
 def test_capture_cli_demo_runs_real_commands():
-    demo = pv.capture_cli_demo()
+    # resolve the CLI from the running interpreter's env too, so this passes when the venv isn't on PATH
+    trellis = shutil.which("trellis") or str(Path(sys.executable).with_name("trellis"))
+    demo = pv.capture_cli_demo(trellis=trellis)
     # every step header present, and real output for at least the read-only ones
     assert "orient" in demo and "MCP tools" in demo
     assert "```console" in demo and "trellis_orient" in demo  # a real MCP tools/list response

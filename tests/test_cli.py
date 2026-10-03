@@ -1,7 +1,6 @@
 """End-to-end CLI: init scaffolds, lint/gate return the exit codes CI blocks on."""
 from pathlib import Path
 
-import pytest
 
 from trellis.cli import main
 

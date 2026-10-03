@@ -7,6 +7,8 @@ All notable changes to Trellis are documented here. The format follows
 ## [Unreleased]
 
 ## [0.10.0] - 2026-08-03
+First tagged and PyPI-published release (v0.1–v0.9 were developed on `main` but never tagged).
+
 ### Added
 - `trellis mcp` — a minimal MCP (Model Context Protocol) server over stdio, in pure stdlib
   (newline-delimited JSON-RPC 2.0, no SDK dependency), exposing `trellis_orient`, `trellis_lint`,
@@ -101,7 +103,5 @@ All notable changes to Trellis are documented here. The format follows
 - `trellis init` scaffolding, a reusable GitHub Action, and adapters for Claude Code + Cursor.
 - Dogfooding: the repo carries its own `trellis.yaml` + `contracts/CONTRACT.md` and gates itself.
 
-[Unreleased]: https://github.com/subirroy71/trellis/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/subirroy71/trellis/releases/tag/v0.3.0
-[0.2.0]: https://github.com/subirroy71/trellis/releases/tag/v0.2.0
-[0.1.0]: https://github.com/subirroy71/trellis/releases/tag/v0.1.0
+[Unreleased]: https://github.com/subirroy71/trellis/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/subirroy71/trellis/releases/tag/v0.10.0

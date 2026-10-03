@@ -1,9 +1,7 @@
 """`trellis review` — verdict parsing, orchestration/record, the real command provider (incl.
 fail-closed on timeout/unparseable), and the review gate (missing/stale/blocked)."""
 import json
-from pathlib import Path
 
-import pytest
 
 from trellis.review import (
     LensResult,

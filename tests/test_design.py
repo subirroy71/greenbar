@@ -1,7 +1,5 @@
 """v0.6 — design-lens pack: persona_file loading, group filtering, and the builtin ADR gate."""
-import json
 
-import pytest
 
 from trellis.config import TrellisConfig
 from trellis.gates import run_gate
