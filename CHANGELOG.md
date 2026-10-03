@@ -5,6 +5,10 @@ All notable changes to Greenbar are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- PR comments for failing runs are readable: a failing deterministic lens records the tool's
+  failure summary (pytest `FAILED`/`ERROR` lines, else the last lines) instead of leading progress
+  output; multi-line findings fold into a collapsible block; counts read "1 lens" / "1 finding".
 
 ## [0.10.0] - 2026-10-03
 First tagged and PyPI-published release (v0.1–v0.9 were developed on `main` but never tagged).
