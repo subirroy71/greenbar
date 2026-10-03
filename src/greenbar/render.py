@@ -21,7 +21,7 @@ def render_pr_comment(
     reviews: Optional[List[Tuple[str, dict]]] = None,
 ) -> str:
     reviews = reviews or []
-    out: List[str] = ["## 🌿 Greenbar"]
+    out: List[str] = ["## 🟩 Greenbar"]
 
     if gate_event:
         tier = gate_event.get("tier", "?")

@@ -50,12 +50,20 @@ def parse_prd(text: str) -> ParsedPRD:
             p.title = l[2:].strip()
             break
 
-    # goal: a labelled line, else the title, else first non-empty non-heading line
+    # goal: a labelled line, else the first line under a "## Goal"-style heading, else the title,
+    # else the first non-empty non-heading line
     for l in lines:
         v = _label_value(l, _GOAL_LABELS)
         if v:
             p.goal = v
             break
+    if not p.goal:
+        for i, l in enumerate(lines):
+            if re.match(r"#{2,6}\s+(goal|objective|problem)s?\s*$", l.strip(), re.IGNORECASE):
+                body = next((x.strip() for x in lines[i + 1:] if x.strip()), "")
+                if body and not body.startswith("#"):
+                    p.goal = _strip_bullet(body)
+                break
     if not p.goal:
         p.goal = p.title
     if not p.goal:

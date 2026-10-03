@@ -212,3 +212,193 @@ class TestDurableHistory:
                 "params": {"name": "greenbar_gate", "arguments": {"tier": "t"}}})
         lines = (repo / ".greenbar" / "history.jsonl").read_text().splitlines()
         assert json.loads(lines[-1])["kind"] == "gate"
+
+
+class TestLightMode:
+    def test_tier_with_no_gates_fails_closed(self, tmp_path):
+        from greenbar.gates import run_tier
+        cfg = GreenbarConfig(axes={}, tiers={"empty": {"gates": []}}, gates={}, path=tmp_path, raw={})
+        results = run_tier("empty", cfg)
+        assert len(results) == 1 and results[0].ok is False and "no gates" in results[0].detail
+
+    @pytest.mark.parametrize("preset", ["python", "node", "go", "rust"])
+    def test_presets_trivial_tier_needs_no_contract_but_still_checks(self, preset):
+        import yaml
+        from pathlib import Path
+        import greenbar
+        cfg = yaml.safe_load((Path(greenbar.__file__).parent / "templates" / "presets" / f"{preset}.yaml").read_text())
+        trivial = cfg["tiers"]["trivial"]["gates"]
+        assert "contract" not in trivial and "test" in trivial
+        assert ("fmt" if preset == "rust" else "lint") in trivial
+        assert all(g in cfg["gates"] for g in trivial)
+        assert "contract" in cfg["tiers"]["scoped"]["gates"]  # real changes still need one
+
+
+class TestInitAgents:
+    def test_init_installs_agent_adapters(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.chdir(tmp_path)
+        assert main(["init", "--agent", "claude-code", "--agent", "cursor"]) == 0
+        skill = (tmp_path / ".claude" / "skills" / "greenbar" / "SKILL.md").read_text()
+        assert skill.startswith("---\nname: greenbar")
+        rule = (tmp_path / ".cursor" / "rules" / "greenbar.mdc").read_text()
+        assert rule.startswith("---\ndescription:") and "alwaysApply: true" in rule
+        assert "Paste into" not in rule
+        assert "claude mcp add greenbar -- greenbar mcp" in capsys.readouterr().out
+
+    def test_init_without_agent_writes_none_but_hints(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.chdir(tmp_path)
+        assert main(["init"]) == 0
+        assert not (tmp_path / ".claude").exists() and not (tmp_path / ".cursor").exists()
+        assert "--agent claude-code" in capsys.readouterr().out
+
+    def test_init_never_writes_through_a_dangling_symlink(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        tgt = tmp_path / ".claude" / "skills" / "greenbar" / "SKILL.md"
+        tgt.parent.mkdir(parents=True)
+        elsewhere = tmp_path / "outside.md"
+        tgt.symlink_to(elsewhere)
+        main(["init", "--agent", "claude-code"])
+        assert not elsewhere.exists()
+
+    def test_init_never_overwrites_an_existing_adapter(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        tgt = tmp_path / ".claude" / "skills" / "greenbar" / "SKILL.md"
+        tgt.parent.mkdir(parents=True)
+        tgt.write_text("mine")
+        main(["init", "--agent", "claude-code"])
+        assert tgt.read_text() == "mine"
+
+
+class TestLightModeClassification:
+    """Light mode is docs-only: no contract-dodging by splitting code into tiny PRs."""
+
+    @staticmethod
+    def _tier(preset, files, lines=2):
+        import yaml
+        from pathlib import Path
+        import greenbar
+        from greenbar.classify import DiffStat, classify
+        cfg = yaml.safe_load((Path(greenbar.__file__).parent / "templates" / "presets" / f"{preset}.yaml").read_text())
+        return classify(DiffStat(files=files, added=lines, removed=0), cfg["classify"])[0]
+
+    @pytest.mark.parametrize("preset", ["python", "node", "go", "rust"])
+    def test_docs_only_is_light(self, preset):
+        assert self._tier(preset, ["README.md", "docs/guide.md"]) == "trivial"
+
+    @pytest.mark.parametrize("preset", ["python", "node", "go", "rust"])
+    def test_tiny_code_change_still_needs_a_contract(self, preset):
+        tier = self._tier(preset, ["src/app.x"], lines=1)
+        assert tier != "trivial"
+
+    @pytest.mark.parametrize("preset", ["python", "node", "go", "rust"])
+    @pytest.mark.parametrize("path", ["docs/build.py", "docs/scripts/gen.sh", "docs/conf.js"])
+    def test_code_under_docs_is_not_light(self, preset, path):
+        assert self._tier(preset, ["docs/guide.md", path]) != "trivial"
+
+    @pytest.mark.parametrize("preset", ["python", "node", "go", "rust"])
+    def test_touching_a_contract_gets_it_linted(self, preset):
+        assert self._tier(preset, ["contracts/x.md"]) == "scoped"
+
+
+
+class TestDiffParsersSeeOldPaths:
+    """Renaming or deleting code must never read as a docs-only (light) change."""
+
+    def test_numstat_rename_notation_expands_to_both_paths(self):
+        from greenbar.classify import parse_numstat
+        assert parse_numstat("0\t0\tsrc/app.py => docs/app.md\n").files == ["src/app.py", "docs/app.md"]
+        assert parse_numstat("1\t1\tsrc/{app.py => notes.md}\n").files == ["src/app.py", "src/notes.md"]
+        assert parse_numstat("1\t1\t{src => docs}/app.md\n").files == ["src/app.md", "docs/app.md"]
+
+    def test_unified_diff_records_deleted_and_renamed_paths(self):
+        from greenbar.classify import parse_unified_diff
+        deletion = ("diff --git a/src/app.py b/src/app.py\ndeleted file mode 100644\n"
+                    "--- a/src/app.py\n+++ /dev/null\n@@ -1 +0,0 @@\n-x = 1\n")
+        assert "src/app.py" in parse_unified_diff(deletion).files
+        rename = ("diff --git a/src/app.py b/docs/app.md\nsimilarity index 100%\n"
+                  "rename from src/app.py\nrename to docs/app.md\n")
+        assert set(parse_unified_diff(rename).files) == {"src/app.py", "docs/app.md"}
+
+    def test_git_rename_of_code_to_markdown_is_not_light(self, repo):
+        from greenbar.classify import classify, git_numstat
+        (repo / "app.md").write_text("x = 1\n")  # same content → git would detect a rename
+        _git(repo, "rm", "-q", "app.py")
+        _git(repo, "add", "app.md")
+        stat = git_numstat()
+        assert "app.py" in stat.files and "app.md" in stat.files
+        rules = {"default": "scoped", "rules": [{"tier": "trivial", "only_paths": ["**/*.md"]}]}
+        assert classify(stat, rules)[0] == "scoped"
+
+
+    def test_unified_diff_sees_empty_added_files(self):
+        from greenbar.classify import parse_unified_diff
+        empty = "diff --git a/src/pkg/__init__.py b/src/pkg/__init__.py\nnew file mode 100644\nindex 0000000..e69de29\n"
+        assert "src/pkg/__init__.py" in parse_unified_diff(empty).files
+
+    def test_removed_sql_comment_is_a_removed_line_not_a_header(self):
+        from greenbar.classify import parse_unified_diff
+        diff = ("diff --git a/q.sql b/q.sql\n--- a/q.sql\n+++ b/q.sql\n@@ -1,2 +1 @@\n"
+                "--- old comment\n select 1;\n")
+        stat = parse_unified_diff(diff)
+        assert stat.files == ["q.sql"] and stat.removed == 1
+
+    def test_untracked_code_beside_a_doc_edit_is_not_light(self, repo):
+        from greenbar.classify import classify, git_numstat
+        (repo / "README.md").write_text("docs\n")
+        _git(repo, "add", "README.md")
+        _git(repo, "commit", "-q", "-m", "readme")
+        (repo / "README.md").write_text("docs edited\n")
+        (repo / "feature.py").write_text("def f():\n    return 1\n")  # untracked
+        stat = git_numstat()
+        assert "feature.py" in stat.files
+        rules = {"default": "scoped", "rules": [{"tier": "trivial", "only_paths": ["**/*.md"]}]}
+        assert classify(stat, rules)[0] == "scoped"
+
+    @pytest.mark.parametrize("preset", ["python", "node", "go", "rust"])
+    @pytest.mark.parametrize("path", ["lenses/design.simplicity.md", "config/lenses/security.md"])
+    def test_editing_reviewer_prompts_is_not_light(self, preset, path):
+        assert TestLightModeClassification._tier(preset, [path]) == "scoped"
+
+    def test_plain_multi_file_diff_without_git_headers(self):
+        from greenbar.classify import parse_unified_diff
+        diff = ("--- README.md\n+++ README.md\n@@ -1 +1 @@\n-old\n+new\n"
+                "--- src/app.py\n+++ src/app.py\n@@ -1,2 +1,2 @@\n x = 1\n-y = 2\n+y = 3\n")
+        stat = parse_unified_diff(diff)
+        assert stat.files == ["README.md", "src/app.py"] and (stat.added, stat.removed) == (2, 2)
+
+    def test_hunk_without_counts_and_no_newline_marker(self):
+        from greenbar.classify import parse_unified_diff
+        diff = ("--- a.md\n+++ a.md\n@@ -1 +1 @@\n-a\n\\ No newline at end of file\n+b\n"
+                "--- b.py\n+++ b.py\n@@ -0,0 +1 @@\n+x\n")
+        assert parse_unified_diff(diff).files == ["a.md", "b.py"]
+
+
+    def test_greenbar_state_never_counts_as_part_of_the_change(self, repo):
+        from greenbar.classify import git_numstat
+        (repo / ".greenbar").mkdir()
+        (repo / ".greenbar" / "history.jsonl").write_text("{}\n")
+        assert not any(f.startswith(".greenbar/") for f in git_numstat().files)
+
+
+class TestInitGitignore:
+    def test_init_ignores_local_state_once(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".gitignore").write_text("node_modules/")
+        main(["init"])
+        main(["init"])
+        assert (tmp_path / ".gitignore").read_text() == "node_modules/\n.greenbar/\n"
+
+
+    def test_untracked_code_is_seen_from_a_subdirectory(self, repo, monkeypatch):
+        from greenbar.classify import git_numstat
+        (repo / "docs").mkdir()
+        (repo / "docs" / "a.md").write_text("x\n")
+        (repo / "feature.py").write_text("def f():\n    return 1\n")  # untracked, at the top
+        monkeypatch.chdir(repo / "docs")
+        stat = git_numstat()
+        assert "feature.py" in stat.files and stat.added >= 2
+
+    @pytest.mark.parametrize("preset", ["python", "node", "go", "rust"])
+    @pytest.mark.parametrize("path", ["CLAUDE.md", "AGENTS.md", ".claude/skills/greenbar/SKILL.md"])
+    def test_editing_agent_instructions_is_not_light(self, preset, path):
+        assert TestLightModeClassification._tier(preset, [path]) == "scoped"

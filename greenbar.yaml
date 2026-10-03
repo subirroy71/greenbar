@@ -3,7 +3,7 @@ axes:
   C: [correctness, reasonableness, performance]
 
 tiers:
-  trivial:  { gates: [contract] }
+  trivial:  { gates: [test] }   # light mode: docs / tiny fixes need no contract, still tested
   scoped:   { gates: [contract, test] }
   critical: { gates: [contract, test, coverage, review] }
 
@@ -30,5 +30,5 @@ classify:
   rules:
     - { tier: critical, any_path: ["src/greenbar/gates.py", "src/greenbar/contract.py"] }
     - { tier: critical, min_files: 15 }
-    - { tier: trivial,  only_paths: ["**/*.md", "docs/**", "contracts/**"] }
-    - { tier: trivial,  max_files: 1, max_lines: 10 }
+    - { tier: scoped,   any_path: ["contracts/**", "src/greenbar/templates/**", "CLAUDE.md", "AGENTS.md", ".claude/**", ".cursor/**"] }   # contracts get linted; shipped prompts are policy
+    - { tier: trivial,  only_paths: ["**/*.md", "**/*.rst"] }   # light mode: docs only

@@ -104,8 +104,12 @@ def run_tier(tier: str, cfg: GreenbarConfig, contract: Optional[str] = None) -> 
     t = cfg.tiers.get(tier)
     if t is None:
         raise KeyError(f"unknown tier {tier!r}; known tiers: {', '.join(cfg.tiers) or '(none)'}")
+    gate_names = (t or {}).get("gates") or []
+    if not gate_names:
+        # fail-closed: a tier that checks nothing must not read as a green build
+        return [GateResult("tier", False, f"tier {tier!r} defines no gates — give it at least one")]
     results: List[GateResult] = []
-    for gate_name in t.get("gates", []):
+    for gate_name in gate_names:
         spec = cfg.gates.get(gate_name)
         if spec is None:
             results.append(GateResult(gate_name, False, "gate is not defined under gates: in greenbar.yaml"))

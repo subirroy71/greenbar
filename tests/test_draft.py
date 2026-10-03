@@ -87,3 +87,9 @@ class TestPresets:
         monkeypatch.chdir(tmp_path)
         assert main(["init", "--preset", "cobol"]) == 0
         assert (tmp_path / "greenbar.yaml").exists()  # fell back, no crash
+
+
+def test_goal_heading_section_beats_the_title():
+    from greenbar.draft import parse_prd
+    prd = "# Subtract\n\n## Goal\nAdd a subtract function to calc.\n\n## Requirements\n- x must be y\n"
+    assert parse_prd(prd).goal == "Add a subtract function to calc."
