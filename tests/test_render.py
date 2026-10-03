@@ -32,7 +32,7 @@ class TestRender:
 
     def test_review_verdict_and_findings(self):
         md = render_pr_comment(_gate(), [("Code review", _review())])
-        assert "Code review: 🔸 CHANGES" in md and "2 lenses · 1 findings" in md
+        assert "Code review: 🔸 CHANGES" in md and "2 lenses · 1 finding" in md
         assert "_security_ — nit at x.py:3" in md  # A2
 
     def test_rubber_stamp_flagged(self):

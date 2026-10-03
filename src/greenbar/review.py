@@ -82,6 +82,40 @@ def _excludes(*record_paths: Optional[str]) -> List[str]:
     return out
 
 
+_EXCERPT_CHARS = 800
+
+
+def failure_excerpt(output: str, limit: int = _EXCERPT_CHARS) -> str:
+    """The part of a failing tool's output a reviewer needs: pytest-style `FAILED`/`ERROR` summary
+    lines when present, else the last meaningful lines — never progress dots or dividers. Trimmed by
+    whole lines so the first line (the PR comment's bullet) is never a fragment."""
+    def noise(ln: str) -> bool:  # progress dots and ==== dividers carry no information
+        return set(ln) <= set(".sFEx[]% 0123456789") or ln.lstrip().startswith(("===", "___", "---"))
+
+    lines = [ln.rstrip() for ln in (output or "").splitlines() if ln.strip()]
+    summary = [ln for ln in lines if ln.startswith(("FAILED ", "ERROR "))]
+    meaningful = [ln for ln in lines if not noise(ln)]
+    if summary:
+        tail = [ln for ln in meaningful[-3:] if ln not in summary]
+        picked = summary + tail
+    else:
+        picked = meaningful[-15:] or lines[-15:]
+    if len(picked) == 1 and len(picked[0]) > limit:
+        return "…" + picked[0][-(limit - 1):]   # one giant line: its end is the informative part
+    kept: List[str] = []
+    for i, ln in enumerate(picked):
+        more = len(picked) - i
+        if len("\n".join(kept + [ln])) + len(f"\n… {more} more lines") > limit and kept:
+            kept.append(f"… {more} more line{'s' if more != 1 else ''}")
+            break
+        kept.append(ln)
+    return "\n".join(kept)
+
+
+def plural(n: int, word: str, plural_word: Optional[str] = None) -> str:
+    return f"{n} {word if n == 1 else (plural_word or word + 's')}"
+
+
 def normalize_verdict(s: Optional[str]) -> str:
     if not s:
         return "ERROR"
@@ -165,7 +199,7 @@ def run_command_lens(lens: dict, contract_text: str, diff: str, timeout_s: float
         return LensResult(
             name,
             "SIGN" if ok else "BLOCK",
-            findings=[] if ok else [combined[:800] or f"exit {proc.returncode}"],
+            findings=[] if ok else [failure_excerpt(combined) or f"exit {proc.returncode}"],
             provider="deterministic",
             raw_excerpt=combined[-1000:],
         )
@@ -288,4 +322,4 @@ def check_review_record(
         return (False, f"review is BLOCKED ({(rec.get('summary') or {}).get('blockers')} blocking lens)")
     if fail_on_rubber_stamp and (rec.get("metrics") or {}).get("all_sign_no_findings"):
         return (False, "every lens SIGNed with zero findings — looks like a rubber stamp")
-    return (True, f"review {sv} · {(rec.get('metrics') or {}).get('lens_count')} lenses{code_note}")
+    return (True, f"review {sv} · {plural(int((rec.get('metrics') or {}).get('lens_count') or 0), 'lens', 'lenses')}{code_note}")

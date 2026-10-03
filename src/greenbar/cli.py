@@ -26,7 +26,7 @@ from .contract import ContractError, load_contract, validate_contract
 from .gates import gate_event, run_tier
 from .history import current_commit, read_all_events, read_events, record_event, record_note
 from .report import aggregate, format_report
-from .review import run_review
+from .review import plural, run_review
 
 _TEMPLATES = Path(__file__).parent / "templates"
 
@@ -200,7 +200,8 @@ def _cmd_review(args) -> int:
         for f in lens.get("findings", []):
             print(f"    - {f}")
     m, s = rec["metrics"], rec["summary"]
-    print(f"\ngreenbar review: {s['verdict']} · {m['lens_count']} lenses · {m['finding_count']} findings"
+    print(f"\ngreenbar review: {s['verdict']} · {plural(m['lens_count'], 'lens', 'lenses')} · "
+          f"{plural(m['finding_count'], 'finding')}"
           f"{' · ⚠ all-SIGN/zero-findings' if m['all_sign_no_findings'] else ''}  →  {args.out}")
     record_event({
         "kind": "review", "contract": args.contract, "verdict": s["verdict"],
