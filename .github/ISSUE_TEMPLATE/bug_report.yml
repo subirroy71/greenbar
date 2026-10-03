@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Trellis doesn't work as documented.
+description: Something in Greenbar doesn't work as documented.
 labels: ["bug"]
 body:
   - type: textarea
@@ -7,22 +7,22 @@ body:
     attributes:
       label: What happened
       description: What did you run and what went wrong?
-      placeholder: "`trellis gate scoped` exited 0 even though a gate failed…"
+      placeholder: "`greenbar gate scoped` exited 0 even though a gate failed…"
     validations:
       required: true
   - type: textarea
     id: repro
     attributes:
       label: Reproduction
-      description: Minimal `trellis.yaml` / contract + the exact command.
+      description: Minimal `greenbar.yaml` / contract + the exact command.
       render: shell
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: Trellis version
-      placeholder: "trellis --version"
+      label: Greenbar version
+      placeholder: "greenbar --version"
     validations:
       required: true
   - type: input

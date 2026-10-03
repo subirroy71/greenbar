@@ -8,5 +8,5 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
-.trellis/review-record.json
-.trellis/history.jsonl
+.greenbar/review-record.json
+.greenbar/history.jsonl

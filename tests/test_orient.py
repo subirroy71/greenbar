@@ -1,5 +1,5 @@
-"""`trellis orient` — the symbol graph, diff-focused ranking, budget, and fail-safety."""
-from trellis.orient import (
+"""`greenbar orient` — the symbol graph, diff-focused ranking, budget, and fail-safety."""
+from greenbar.orient import (
     PythonAstExtractor,
     build_graph,
     pagerank,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a Google NotebookLM-ready video for the Trellis project.
+"""Prepare a Google NotebookLM-ready video for the Greenbar project.
 
 NotebookLM has **no public API** — you upload sources in the web UI and click "Generate".
 So this script automates the part that *can* be automated:
@@ -25,7 +25,7 @@ REPO = Path(__file__).resolve().parents[2]  # scripts/notebooklm/ -> repo root
 
 # (path, why-it-matters) — order = narrative order in the pack. Missing files are skipped.
 SOURCES = [
-    ("README.md", "What Trellis is: the problem, the pitch, the features, how to use it."),
+    ("README.md", "What Greenbar is: the problem, the pitch, the features, how to use it."),
     ("CHANGELOG.md", "How it evolved v0.1 -> v0.10 — the capability arc."),
     ("contracts/CONTRACT.md", "A real contract — the core artifact the whole framework turns on."),
     ("contracts/mcp-server.md", "A second contract, showing the machine-checkable shape (goal/acceptance/axes)."),
@@ -37,7 +37,7 @@ AUDIENCES = {
         "angle": (
             "Lead with the failure mode they recognize: 'smart operator + AI coding tool' produces good "
             "work ad hoc, but it isn't reproducible and it pushes quality defects into review instead of "
-            "surfacing them at authoring. Then show how Trellis makes rigor mechanical — a machine-checked "
+            "surfacing them at authoring. Then show how Greenbar makes rigor mechanical — a machine-checked "
             "contract + a tier of CI gates that must be green before merge. Name the concrete pieces: "
             "contract lint, the tier/gate ladder, the provider-agnostic review panel, auto blast-radius "
             "classification, `orient` (a symbol map), the PR-native comment, and the MCP server that lets "
@@ -48,7 +48,7 @@ AUDIENCES = {
         "who": "an engineering leader / EM deciding whether to adopt a governance framework across teams",
         "angle": (
             "Frame around consistency and accountability at team scale: today quality depends on which "
-            "operator did the work. Trellis turns your standards into gates every change must pass, and "
+            "operator did the work. Greenbar turns your standards into gates every change must pass, and "
             "reports honest metrics (gate pass-rate, rubber-stamp rate, defect-escape from reverts). "
             "Stress low adoption cost — it's a CLI + a CI workflow + an MCP server, tool-agnostic and "
             "dependency-light, not a hosted platform to buy."
@@ -58,17 +58,17 @@ AUDIENCES = {
         "who": "a technical investor assessing the wedge and the market",
         "angle": (
             "Position the shift: the industry is moving to agentic coding, and the open question is who "
-            "owns the governance layer agents call. Trellis is that layer — contract-first gates plus an "
+            "owns the governance layer agents call. Greenbar is that layer — contract-first gates plus an "
             "MCP server so any agent (Claude Code, Cursor) runs the same governed loop. Keep it crisp on "
             "the wedge (enforcement, not advice), the moat (dogfooded, open-source, standards-shaped), and "
             "the roadmap to distribution (PyPI, policy packs)."
         ),
     },
     "oss": {
-        "who": "an open-source developer who might adopt or contribute to Trellis",
+        "who": "an open-source developer who might adopt or contribute to Greenbar",
         "angle": (
-            "Welcoming and concrete: what it does, how to install (`pip install trellis-loop`), the "
-            "one-command onboarding (`trellis init`, `trellis draft` from a PRD), and how it governs its "
+            "Welcoming and concrete: what it does, how to install (`pip install greenbar`), the "
+            "one-command onboarding (`greenbar init`, `greenbar draft` from a PRD), and how it governs its "
             "own repo (dogfooding). Invite contribution: Apache-2.0, small stdlib core, clear extension "
             "points (shell-command review lenses, tree-sitter extractors, policy packs)."
         ),
@@ -94,9 +94,9 @@ def collect_sources(repo: Path = REPO):
 
 def build_source_pack(repo: Path = REPO, extra=None) -> str:
     parts = [
-        "# Trellis — project source pack (for a NotebookLM overview)",
+        "# Greenbar — project source pack (for a NotebookLM overview)",
         "",
-        "> This single document bundles the Trellis project's own materials so a NotebookLM "
+        "> This single document bundles the Greenbar project's own materials so a NotebookLM "
         "notebook has one clean, coherent source to narrate. Each section below is a real file "
         "from the repository.",
         "",
@@ -140,8 +140,8 @@ def _run(cmd, cwd, stdin=None, limit=22):
     return "\n".join(lines)
 
 
-def capture_cli_demo(repo: Path = REPO, trellis: str = "trellis") -> str:
-    """Run a real Trellis walkthrough and return it as a Markdown transcript.
+def capture_cli_demo(repo: Path = REPO, greenbar: str = "greenbar") -> str:
+    """Run a real Greenbar walkthrough and return it as a Markdown transcript.
 
     A visual, in-action source for the video — every command and its output is real.
     """
@@ -150,27 +150,27 @@ def capture_cli_demo(repo: Path = REPO, trellis: str = "trellis") -> str:
     import tempfile
 
     blocks = [
-        "# Trellis — captured CLI session",
+        "# Greenbar — captured CLI session",
         "",
         "> Real commands and real output, so the overview can show the tool actually running "
         "(these double as the 'screenshots' of the walkthrough).",
     ]
-    tmp = Path(tempfile.mkdtemp(prefix="trellis-demo-"))
+    tmp = Path(tempfile.mkdtemp(prefix="greenbar-demo-"))
     try:
         subprocess.run(["git", "init", "-q", "."], cwd=str(tmp))
         (tmp / "login-throttle.prd.md").write_text(SAMPLE_PRD, encoding="utf-8")
         steps = [
-            ("Scaffold governance into a repo", [trellis, "init", "--preset", "python"], tmp, None),
+            ("Scaffold governance into a repo", [greenbar, "init", "--preset", "python"], tmp, None),
             ("Draft a contract from a PRD",
-             [trellis, "draft", "login-throttle.prd.md", "--id", "login-throttle"], tmp, None),
+             [greenbar, "draft", "login-throttle.prd.md", "--id", "login-throttle"], tmp, None),
             ("Validate the contract (machine-checked)",
-             [trellis, "lint", "contracts/login-throttle.md"], tmp, None),
+             [greenbar, "lint", "contracts/login-throttle.md"], tmp, None),
             ("Map the code — orient",
-             [trellis, "orient", "--path", str(repo / "src" / "trellis"), "--budget", "350"], repo, None),
-            ("Agent-native — list the MCP tools", [trellis, "mcp"], repo,
+             [greenbar, "orient", "--path", str(repo / "src" / "greenbar"), "--budget", "350"], repo, None),
+            ("Agent-native — list the MCP tools", [greenbar, "mcp"], repo,
              '{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n'),
         ]
-        # NOTE: no live `trellis gate` step — the scoped gate runs the test suite, and this capture
+        # NOTE: no live `greenbar gate` step — the scoped gate runs the test suite, and this capture
         # is itself exercised by a test, so running it here would recurse. Gates are narrated in the
         # prompt + beat sheet instead. The GIF tape (demo.tape) shows a live gate in a scratch dir.
         for title, cmd, cwd, stdin in steps:
@@ -187,9 +187,9 @@ def build_prompt(audience: str, fmt: str, minutes: int, tone: str) -> str:
     a = AUDIENCES[audience]
     medium = "video overview" if fmt == "video" else "audio overview (podcast-style)"
     return "\n".join([
-        f"Create a ~{minutes}-minute {medium} about Trellis for {a['who']}.",
+        f"Create a ~{minutes}-minute {medium} about Greenbar for {a['who']}.",
         "",
-        "What Trellis is (one line): a contract-first, gate-enforced software-development governance "
+        "What Greenbar is (one line): a contract-first, gate-enforced software-development governance "
         "framework — it turns best-practices into CI gates a change cannot merge without passing.",
         "",
         f"Angle & content: {a['angle']}",
@@ -201,7 +201,7 @@ def build_prompt(audience: str, fmt: str, minutes: int, tone: str) -> str:
         "  2. The idea — machine-checked contract + tier of gates; skipping = a failing build.",
         "  3. The pieces — walk the loop concretely (draft -> contract -> gate -> review -> PR comment).",
         "  4. Why it's different — enforcement at authoring; tool-agnostic; agent-native via MCP.",
-        "  5. Close — how to try it (`pip install trellis-loop`, `trellis init`), open-source (Apache-2.0).",
+        "  5. Close — how to try it (`pip install greenbar`, `greenbar init`), open-source (Apache-2.0).",
         "",
         "Do NOT: invent features not in the sources, overstate maturity (it's an early beta), or use "
         "marketing filler. Ground every claim in the provided sources.",
@@ -211,7 +211,7 @@ def build_prompt(audience: str, fmt: str, minutes: int, tone: str) -> str:
 def build_steps(audience: str, fmt: str, minutes: int, out_dir: Path) -> str:
     medium = "Video Overview" if fmt == "video" else "Audio Overview"
     return "\n".join([
-        f"# Producing the Trellis video with NotebookLM ({audience}, {fmt}, ~{minutes} min)",
+        f"# Producing the Greenbar video with NotebookLM ({audience}, {fmt}, ~{minutes} min)",
         "",
         "NotebookLM has no API, so these steps are manual (2-3 minutes of clicking):",
         "",
@@ -237,7 +237,7 @@ def build_steps(audience: str, fmt: str, minutes: int, out_dir: Path) -> str:
         "- **[0:00] Hook.** Most AI (and human) dev workflows *generate* rigor — a spec, a review, a "
         "Definition of Done — but don't *guarantee* it. The standard lives in a doc; following it is a "
         "judgment call.",
-        "- **[0:20] The turn.** Trellis makes rigor mechanical: a change declares a machine-checked "
+        "- **[0:20] The turn.** Greenbar makes rigor mechanical: a change declares a machine-checked "
         "*contract*, and a *tier of gates* must be green before it can merge. Skipping the process "
         "becomes a failing build.",
         "- **[0:50] The loop.** Draft a contract from a PRD -> lint it -> classify the change's "
@@ -246,7 +246,7 @@ def build_steps(audience: str, fmt: str, minutes: int, out_dir: Path) -> str:
         "- **[2:00] Why it's different.** Enforcement happens at *authoring*, not review. It's "
         "tool-agnostic and dependency-light — and agent-native: an MCP server lets Claude Code or "
         "Cursor call the same governed loop mid-task.",
-        "- **[3:00] Close.** Open-source, Apache-2.0. `pip install trellis-loop`, then `trellis init`. "
+        "- **[3:00] Close.** Open-source, Apache-2.0. `pip install greenbar`, then `greenbar init`. "
         "It even governs its own repo.",
     ])
 
@@ -270,13 +270,13 @@ def prepare(audience: str, fmt: str, minutes: int, tone: str, out_dir: Path,
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Prepare a NotebookLM video source pack + prompt for Trellis.")
+    ap = argparse.ArgumentParser(description="Prepare a NotebookLM video source pack + prompt for Greenbar.")
     ap.add_argument("--audience", choices=sorted(AUDIENCES), default="developers")
     ap.add_argument("--format", dest="fmt", choices=["video", "audio"], default="video")
     ap.add_argument("--minutes", type=int, default=4)
     ap.add_argument("--tone", choices=sorted(TONES), default="energetic")
     ap.add_argument("--with-demo", action="store_true",
-                    help="run a live Trellis walkthrough and add the captured session as a source")
+                    help="run a live Greenbar walkthrough and add the captured session as a source")
     ap.add_argument("--out-dir", default=str(REPO / "build" / "notebooklm"))
     args = ap.parse_args(argv)
 

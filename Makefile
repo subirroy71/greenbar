@@ -7,7 +7,7 @@ test:  ## run the test suite
 	pytest -q
 
 gate:  ## run the scoped gate on this repo's own contract
-	trellis gate scoped --contract contracts/enforcement-hardening.md
+	greenbar gate scoped --contract contracts/enforcement-hardening.md
 
 video:  ## prepare NotebookLM inputs (AUDIENCE/FORMAT/MINUTES/TONE override defaults)
 	python scripts/notebooklm/prepare_video.py \
@@ -24,4 +24,4 @@ gif:  ## render a real CLI GIF (needs charmbracelet/vhs: brew install vhs)
 	vhs scripts/notebooklm/demo.tape
 
 clean:  ## remove build artifacts
-	rm -rf build dist *.egg-info src/*.egg-info .trellis
+	rm -rf build dist *.egg-info src/*.egg-info .greenbar

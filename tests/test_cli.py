@@ -2,14 +2,14 @@
 from pathlib import Path
 
 
-from trellis.cli import main
+from greenbar.cli import main
 
 
 def test_init_then_lint_then_gate(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     # init scaffolds a config + example contract
     assert main(["init"]) == 0
-    assert (tmp_path / "trellis.yaml").exists()
+    assert (tmp_path / "greenbar.yaml").exists()
     contract = tmp_path / "contracts" / "CONTRACT.example.md"
     assert contract.exists()
 
@@ -41,8 +41,8 @@ def test_review_gate_blocks_when_record_missing_then_passes_when_fresh(tmp_path,
     monkeypatch.chdir(tmp_path)
     main(["init"])
     contract = tmp_path / "contracts" / "CONTRACT.example.md"
-    from trellis.config import load_config
-    from trellis.gates import run_gate
+    from greenbar.config import load_config
+    from greenbar.gates import run_gate
     cfg = load_config()
 
     # no review record yet → the builtin `review` gate fails (blocks merge)
@@ -52,8 +52,8 @@ def test_review_gate_blocks_when_record_missing_then_passes_when_fresh(tmp_path,
     import hashlib
     import json
     h = hashlib.sha256(contract.read_text().encode()).hexdigest()[:16]
-    Path(".trellis").mkdir(exist_ok=True)
-    Path(".trellis/review-record.json").write_text(json.dumps({
+    Path(".greenbar").mkdir(exist_ok=True)
+    Path(".greenbar/review-record.json").write_text(json.dumps({
         "contract_hash": h,
         "summary": {"verdict": "PASS", "blockers": 0},
         "metrics": {"lens_count": 2, "all_sign_no_findings": False},

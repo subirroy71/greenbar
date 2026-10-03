@@ -2,8 +2,8 @@
 
 import pytest
 
-from trellis.config import load_config
-from trellis.gates import run_gate, run_tier
+from greenbar.config import load_config
+from greenbar.gates import run_gate, run_tier
 
 _CONFIG = """
 axes:
@@ -36,7 +36,7 @@ body
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
-    (tmp_path / "trellis.yaml").write_text(_CONFIG)
+    (tmp_path / "greenbar.yaml").write_text(_CONFIG)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 

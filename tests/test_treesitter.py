@@ -2,8 +2,8 @@
 extractor (skipped cleanly when the optional extra is absent)."""
 import pytest
 
-from trellis import treesitter as ts
-from trellis.orient import PythonAstExtractor, Symbol, build_graph, default_extractors
+from greenbar import treesitter as ts
+from greenbar.orient import PythonAstExtractor, Symbol, build_graph, default_extractors
 
 
 # ---- always run: these don't need the optional extra ----
@@ -42,7 +42,7 @@ def test_unsupported_file_is_skipped(tmp_path):
     assert "f" in g.by_name  # .bin ignored, no crash (A4)
 
 
-# ---- real tree-sitter (skips when `pip install trellis-loop[treesitter]` isn't present) ----
+# ---- real tree-sitter (skips when `pip install greenbar[treesitter]` isn't present) ----
 
 def test_treesitter_extracts_js_and_go(tmp_path):
     pytest.importorskip("tree_sitter_language_pack")

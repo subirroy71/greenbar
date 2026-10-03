@@ -1,19 +1,19 @@
-# Contributing to Trellis
+# Contributing to Greenbar
 
-Trellis dogfoods itself — so contributing *is* using it.
+Greenbar dogfoods itself — so contributing *is* using it.
 
 ## Dev setup
 ```bash
 pip install -e ".[dev]"
 pytest -q                 # the suite
-trellis gate scoped --contract contracts/CONTRACT.md   # what CI runs
+greenbar gate scoped --contract contracts/CONTRACT.md   # what CI runs
 ```
 
 ## The bar for a change
 1. Write/extend a contract in `contracts/` (or update the repo's `contracts/CONTRACT.md`).
-2. `trellis lint <contract>` must pass.
+2. `greenbar lint <contract>` must pass.
 3. TDD: a failing test first, then the code. Keep the tool dependency-light (stdlib + PyYAML).
-4. `trellis gate scoped --contract contracts/CONTRACT.md` must be green before you open the PR.
+4. `greenbar gate scoped --contract contracts/CONTRACT.md` must be green before you open the PR.
 5. New behavior needs a test that would fail without it.
 
 ## Design principles (don't regress these)

@@ -2,8 +2,8 @@
 import json
 from pathlib import Path
 
-from trellis.cli import main
-from trellis.render import MARKER, render_pr_comment
+from greenbar.cli import main
+from greenbar.render import MARKER, render_pr_comment
 
 
 def _gate(ok=True):
@@ -47,22 +47,22 @@ class TestRender:
 class TestRenderCLI:
     def test_render_reads_history_and_review(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / ".trellis").mkdir()
-        (tmp_path / ".trellis" / "history.jsonl").write_text(json.dumps(_gate()) + "\n")
-        (tmp_path / ".trellis" / "review-record.json").write_text(json.dumps(_review()))
+        (tmp_path / ".greenbar").mkdir()
+        (tmp_path / ".greenbar" / "history.jsonl").write_text(json.dumps(_gate()) + "\n")
+        (tmp_path / ".greenbar" / "review-record.json").write_text(json.dumps(_review()))
         assert main(["render"]) == 0
         out = capsys.readouterr().out
-        assert "🌿 Trellis" in out and "Code review" in out and MARKER in out
+        assert "🌿 Greenbar" in out and "Code review" in out and MARKER in out
 
     def test_render_out_file(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / ".trellis").mkdir()
-        (tmp_path / ".trellis" / "history.jsonl").write_text(json.dumps(_gate()) + "\n")
+        (tmp_path / ".greenbar").mkdir()
+        (tmp_path / ".greenbar" / "history.jsonl").write_text(json.dumps(_gate()) + "\n")
         assert main(["render", "--out", "c.md"]) == 0
         assert MARKER in (tmp_path / "c.md").read_text()
 
 
 def test_pr_workflow_template_ships():
-    import trellis
-    wf = Path(trellis.__file__).parent / "templates" / "github" / "trellis-pr.yml"
-    assert wf.exists() and "trellis gate --auto" in wf.read_text()  # A4
+    import greenbar
+    wf = Path(greenbar.__file__).parent / "templates" / "github" / "greenbar-pr.yml"
+    assert wf.exists() and "greenbar gate --auto" in wf.read_text()  # A4

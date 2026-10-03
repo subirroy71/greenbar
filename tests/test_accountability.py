@@ -1,5 +1,5 @@
 """v0.8 — the accountability metric: revert parsing, escape linkage, honest handling."""
-from trellis.accountability import Commit, compute, find_reverts, format_report, gated_commits
+from greenbar.accountability import Commit, compute, find_reverts, format_report, gated_commits
 
 DAY = 86400
 
@@ -69,7 +69,7 @@ class TestCompute:
     def test_empty_inputs_do_not_crash(self):
         r = compute([], [])
         assert r.gated_changes == 0 and r.escape_rate is None
-        assert "Trellis accountability" in format_report(r)  # A5 — proxy label present
+        assert "Greenbar accountability" in format_report(r)  # A5 — proxy label present
 
     def test_output_labels_reverts_as_proxy(self):
         out = format_report(compute([_gate("x")], []))

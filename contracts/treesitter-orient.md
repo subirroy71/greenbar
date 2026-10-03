@@ -1,10 +1,10 @@
 ---
-id: trellis-v0.5-treesitter-orient
-goal: "Make `trellis orient` polyglot: an optional tree-sitter extractor covering the languages graphify handles (JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#) · measurable: with the extra installed, orient maps a non-Python repo; without it, orient still works Python-only · constraint: tree-sitter is an OPTIONAL extra — Trellis core stays stdlib + PyYAML."
+id: greenbar-v0.5-treesitter-orient
+goal: "Make `greenbar orient` polyglot: an optional tree-sitter extractor covering the languages graphify handles (JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#) · measurable: with the extra installed, orient maps a non-Python repo; without it, orient still works Python-only · constraint: tree-sitter is an OPTIONAL extra — Greenbar core stays stdlib + PyYAML."
 tier: scoped
 
 non_goals:
-  - "bundling tree-sitter into core deps (it is `pip install trellis-loop[treesitter]`)"
+  - "bundling tree-sitter into core deps (it is `pip install greenbar[treesitter]`)"
   - "full/precise cross-language resolution — still an approximate orientation map (name-based edges)"
   - "shipping per-language tags.scm query files — a compact node-type table covers the orientation need"
 
@@ -30,7 +30,7 @@ hitl:
   - "merge to main"
 ---
 
-# Trellis v0.5 — polyglot `trellis orient`
+# Greenbar v0.5 — polyglot `greenbar orient`
 
 **Why.** v0.4's orient is Python-only (stdlib `ast`). graphify's reach is multi-language via
 tree-sitter. This adds that reach — as an **optional extra**, so core stays dependency-light and

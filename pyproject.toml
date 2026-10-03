@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trellis-loop"
+name = "greenbar"
 dynamic = ["version"]
 description = "Contract-first, gate-enforced development framework — turn best-practices into CI gates."
 readme = "README.md"
@@ -27,28 +27,28 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/subirroy71/trellis"
-Repository = "https://github.com/subirroy71/trellis"
-Changelog = "https://github.com/subirroy71/trellis/blob/main/CHANGELOG.md"
-Issues = "https://github.com/subirroy71/trellis/issues"
+Homepage = "https://github.com/subirroy71/greenbar"
+Repository = "https://github.com/subirroy71/greenbar"
+Changelog = "https://github.com/subirroy71/greenbar/blob/main/CHANGELOG.md"
+Issues = "https://github.com/subirroy71/greenbar/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov", "ruff"]
-# Polyglot `trellis orient` (JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …).
-# Core stays dependency-light; this is opt-in: `pip install trellis-loop[treesitter]`.
+# Polyglot `greenbar orient` (JS/TS, Go, Rust, Java, C/C++, Kotlin, Swift, Ruby, C#, …).
+# Core stays dependency-light; this is opt-in: `pip install greenbar[treesitter]`.
 treesitter = ["tree-sitter-language-pack>=0.2"]
 
 [project.scripts]
-trellis = "trellis.cli:main"
+greenbar = "greenbar.cli:main"
 
 [tool.setuptools.dynamic]
-version = { attr = "trellis.__version__" }
+version = { attr = "greenbar.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-trellis = ["templates/*.yaml", "templates/*.md", "templates/adapters/**/*", "templates/lenses/*.md", "templates/presets/*.yaml", "templates/github/*.yml"]
+greenbar = ["templates/*.yaml", "templates/*.md", "templates/adapters/**/*", "templates/lenses/*.md", "templates/presets/*.yaml", "templates/github/*.yml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,5 +1,5 @@
 """Auto blast-radius classification — glob matching, diff parsing, and the rule engine."""
-from trellis.classify import (
+from greenbar.classify import (
     DiffStat,
     classify,
     glob_to_re,

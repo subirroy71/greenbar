@@ -1,6 +1,6 @@
-"""History logging + `trellis report` aggregation and signals."""
-from trellis.history import read_events, record_event
-from trellis.report import aggregate, format_report, signals
+"""History logging + `greenbar report` aggregation and signals."""
+from greenbar.history import read_events, record_event
+from greenbar.report import aggregate, format_report, signals
 
 
 class TestHistory:
@@ -52,7 +52,7 @@ class TestAggregate:
         agg = aggregate([])
         assert agg["gate"]["runs"] == 0 and agg["gate"]["pass_rate"] is None
         # formatting an empty report must also not crash
-        assert "Trellis report" in format_report(agg)
+        assert "Greenbar report" in format_report(agg)
 
 
 class TestSignals:

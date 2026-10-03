@@ -1,10 +1,10 @@
-"""`trellis review` — verdict parsing, orchestration/record, the real command provider (incl.
+"""`greenbar review` — verdict parsing, orchestration/record, the real command provider (incl.
 fail-closed on timeout/unparseable), and the review gate (missing/stale/blocked)."""
 import json
 
 import pytest
 
-from trellis.review import (
+from greenbar.review import (
     LensResult,
     build_prompt,
     check_review_record,

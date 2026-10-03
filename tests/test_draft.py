@@ -1,8 +1,8 @@
-"""v0.7 — `trellis draft` (PRD → lint-clean contract) + stack presets."""
+"""v0.7 — `greenbar draft` (PRD → lint-clean contract) + stack presets."""
 
-from trellis.cli import main
-from trellis.contract import parse_contract, validate_contract
-from trellis.draft import ParsedPRD, build_contract, parse_prd
+from greenbar.cli import main
+from greenbar.contract import parse_contract, validate_contract
+from greenbar.draft import ParsedPRD, build_contract, parse_prd
 
 _CATALOG = {"C": ["correctness", "reasonableness"]}
 
@@ -80,10 +80,10 @@ class TestPresets:
     def test_init_preset_writes_stack_gates(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         assert main(["init", "--preset", "go"]) == 0
-        cfg = (tmp_path / "trellis.yaml").read_text()
+        cfg = (tmp_path / "greenbar.yaml").read_text()
         assert "go test ./..." in cfg and "go vet ./..." in cfg  # A5
 
     def test_unknown_preset_falls_back_to_generic(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         assert main(["init", "--preset", "cobol"]) == 0
-        assert (tmp_path / "trellis.yaml").exists()  # fell back, no crash
+        assert (tmp_path / "greenbar.yaml").exists()  # fell back, no crash

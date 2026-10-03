@@ -1,0 +1,16 @@
+name: greenbar
+on: [push, pull_request]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      # Greenbar gates itself: the 'scoped' tier = [contract, test], against the contract of the
+      # change in flight (update this path with each release's contract).
+      # A bad contract or a failing test exits non-zero and blocks the merge.
+      - run: greenbar gate scoped --contract contracts/enforcement-hardening.md -v

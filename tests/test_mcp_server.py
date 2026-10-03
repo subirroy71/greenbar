@@ -2,8 +2,8 @@
 import io
 import json
 
-from trellis import __version__
-from trellis.mcp_server import handle, serve, TOOLS
+from greenbar import __version__
+from greenbar.mcp_server import handle, serve, TOOLS
 
 
 def _req(method, params=None, mid=1):
@@ -15,12 +15,12 @@ class TestProtocol:
         r = handle(_req("initialize", {"protocolVersion": "2025-06-18"}))["result"]
         assert r["protocolVersion"] == "2025-06-18"
         assert "tools" in r["capabilities"]
-        assert r["serverInfo"] == {"name": "trellis", "version": __version__}
+        assert r["serverInfo"] == {"name": "greenbar", "version": __version__}
 
     def test_tools_list_exposes_schema(self):  # A2
         tools = handle(_req("tools/list"))["result"]["tools"]
         names = {t["name"] for t in tools}
-        assert {"trellis_orient", "trellis_lint", "trellis_classify", "trellis_draft"} <= names
+        assert {"greenbar_orient", "greenbar_lint", "greenbar_classify", "greenbar_draft"} <= names
         for t in tools:
             assert t["description"] and t["inputSchema"]["type"] == "object"
 
@@ -37,7 +37,7 @@ class TestProtocol:
 
 class TestToolsCall:
     def test_known_tool_returns_text(self):  # A3
-        r = handle(_req("tools/call", {"name": "trellis_draft",
+        r = handle(_req("tools/call", {"name": "greenbar_draft",
                                        "arguments": {"prd": "# Goal\nDo X\n## Acceptance\n- must Y"}}))["result"]
         assert r["content"][0]["type"] == "text" and "id:" in r["content"][0]["text"]
         assert not r.get("isError")
@@ -47,13 +47,13 @@ class TestToolsCall:
         assert r["isError"] and "unknown tool" in r["content"][0]["text"]
 
     def test_raising_tool_degrades_gracefully(self):  # A5 — missing required contract path
-        r = handle(_req("tools/call", {"name": "trellis_lint",
+        r = handle(_req("tools/call", {"name": "greenbar_lint",
                                        "arguments": {"contract": "/no/such/file.md"}}))["result"]
         assert r["isError"] and "content" in r  # error text, no crash
 
     def test_orient_runs_on_this_repo(self):
-        r = handle(_req("tools/call", {"name": "trellis_orient",
-                                       "arguments": {"path": "src/trellis", "budget": 400}}))["result"]
+        r = handle(_req("tools/call", {"name": "greenbar_orient",
+                                       "arguments": {"path": "src/greenbar", "budget": 400}}))["result"]
         assert not r.get("isError") and "symbols" in r["content"][0]["text"]
 
 

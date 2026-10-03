@@ -9,12 +9,12 @@ import subprocess
 
 import pytest
 
-from trellis.cli import main
-from trellis.config import TrellisConfig
-from trellis.contract import parse_contract, validate_contract
-from trellis.gates import run_gate
-from trellis.history import current_commit, read_all_events, read_note_events, record_note
-from trellis.review import LensResult, check_review_record, run_review, worktree_fingerprint
+from greenbar.cli import main
+from greenbar.config import GreenbarConfig
+from greenbar.contract import parse_contract, validate_contract
+from greenbar.gates import run_gate
+from greenbar.history import current_commit, read_all_events, read_note_events, record_note
+from greenbar.review import LensResult, check_review_record, run_review, worktree_fingerprint
 
 CATALOG = {"C": ["correctness"]}
 GOOD = """---
@@ -89,7 +89,7 @@ class TestContractEnforcement:
     def test_contract_gate_rejects_undefined_tier(self, tmp_path):
         c = tmp_path / "c.md"
         c.write_text(GOOD.replace("tier: scoped", "tier: nope"))
-        cfg = TrellisConfig(axes=CATALOG, tiers={"scoped": {}}, gates={}, path=tmp_path, raw={})
+        cfg = GreenbarConfig(axes=CATALOG, tiers={"scoped": {}}, gates={}, path=tmp_path, raw={})
         r = run_gate("contract", {"builtin": "contract"}, cfg, str(c))
         assert r.ok is False and "C013" in r.detail
 
@@ -120,7 +120,7 @@ class TestReviewFreshness:
         assert staged == ""
 
     def test_review_of_older_code_is_stale(self, repo):
-        out = repo / ".trellis" / "review-record.json"
+        out = repo / ".greenbar" / "review-record.json"
         self._review(out)
         ok, _ = check_review_record(None, str(out))
         assert ok is True
@@ -134,10 +134,10 @@ class TestReviewFreshness:
         ok, msg = check_review_record(None, str(out))
         assert ok is False and "STALE" in msg
 
-    def test_trellis_artifacts_dont_affect_freshness(self, repo):
-        out = repo / ".trellis" / "review-record.json"
+    def test_greenbar_artifacts_dont_affect_freshness(self, repo):
+        out = repo / ".greenbar" / "review-record.json"
         self._review(out)
-        (repo / ".trellis" / "history.jsonl").write_text("{}\n")
+        (repo / ".greenbar" / "history.jsonl").write_text("{}\n")
         assert check_review_record(None, str(out))[0] is True
 
 
@@ -151,27 +151,27 @@ class TestZeroLenses:
 
     def test_cli_review_exits_nonzero_with_no_lenses(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        (tmp_path / "trellis.yaml").write_text("axes: {C: [correctness]}\n")
+        (tmp_path / "greenbar.yaml").write_text("axes: {C: [correctness]}\n")
         (tmp_path / "d.diff").write_text("")
         assert main(["review", "--diff", "d.diff"]) == 1
 
 
 class TestRunGateTimeout:
     def test_hung_command_fails_the_gate(self, tmp_path):
-        cfg = TrellisConfig(axes={}, tiers={}, gates={}, path=tmp_path, raw={})
+        cfg = GreenbarConfig(axes={}, tiers={}, gates={}, path=tmp_path, raw={})
         r = run_gate("slow", {"run": "sleep 5", "timeout_s": 0.2}, cfg, None)
         assert r.ok is False and "timed out" in r.detail
 
     def test_global_timeout_applies(self, tmp_path):
-        cfg = TrellisConfig(axes={}, tiers={}, gates={}, path=tmp_path, raw={"gate_timeout_s": 0.2})
+        cfg = GreenbarConfig(axes={}, tiers={}, gates={}, path=tmp_path, raw={"gate_timeout_s": 0.2})
         assert run_gate("slow", {"run": "sleep 5"}, cfg, None).ok is False
 
 
 class TestDurableHistory:
-    def test_trellis_commit_env_overrides_head(self, repo, monkeypatch):
-        monkeypatch.setenv("TRELLIS_COMMIT", "abc123")
+    def test_greenbar_commit_env_overrides_head(self, repo, monkeypatch):
+        monkeypatch.setenv("GREENBAR_COMMIT", "abc123")
         assert current_commit() == "abc123"
-        monkeypatch.delenv("TRELLIS_COMMIT")
+        monkeypatch.delenv("GREENBAR_COMMIT")
         assert len(current_commit()) == 40
 
     def test_note_round_trip(self, repo):
@@ -189,14 +189,14 @@ class TestDurableHistory:
         assert read_all_events(str(repo / "h.jsonl")) == [ev]
 
     def test_gate_notes_feed_accountability_after_local_history_is_gone(self, repo, capsys):
-        (repo / "trellis.yaml").write_text(
+        (repo / "greenbar.yaml").write_text(
             "tiers: {t: {gates: [ok]}}\ngates: {ok: {run: 'true'}}\n")
         (repo / "feature.py").write_text("f = 1\n")
         _git(repo, "add", "feature.py")
         _git(repo, "commit", "-q", "-m", "feature")
         assert main(["gate", "t", "--notes"]) == 0
         gated = current_commit()
-        (repo / ".trellis" / "history.jsonl").unlink()  # the ephemeral runner is gone
+        (repo / ".greenbar" / "history.jsonl").unlink()  # the ephemeral runner is gone
         (repo / "app.py").write_text("x = 9\n")
         _git(repo, "commit", "-q", "-am", "next")
         _git(repo, "revert", "--no-edit", gated)
@@ -206,9 +206,9 @@ class TestDurableHistory:
         assert rep["gated_changes"] == 1 and rep["escapes"] == 1
 
     def test_mcp_gate_records_history(self, repo):
-        from trellis.mcp_server import handle
-        (repo / "trellis.yaml").write_text("tiers: {t: {gates: [ok]}}\ngates: {ok: {run: 'true'}}\n")
+        from greenbar.mcp_server import handle
+        (repo / "greenbar.yaml").write_text("tiers: {t: {gates: [ok]}}\ngates: {ok: {run: 'true'}}\n")
         handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                "params": {"name": "trellis_gate", "arguments": {"tier": "t"}}})
-        lines = (repo / ".trellis" / "history.jsonl").read_text().splitlines()
+                "params": {"name": "greenbar_gate", "arguments": {"tier": "t"}}})
+        lines = (repo / ".greenbar" / "history.jsonl").read_text().splitlines()
         assert json.loads(lines[-1])["kind"] == "gate"

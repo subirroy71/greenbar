@@ -20,4 +20,4 @@ hitl: ["merge to main"]
 # Hello feature
 
 The smallest possible real contract — copy it, change the frontmatter, and run
-`trellis lint contracts/CONTRACT.md` then `trellis gate scoped --contract contracts/CONTRACT.md`.
+`greenbar lint contracts/CONTRACT.md` then `greenbar gate scoped --contract contracts/CONTRACT.md`.

@@ -1,15 +1,15 @@
 """v0.6 — design-lens pack: persona_file loading, group filtering, and the builtin ADR gate."""
 
 
-from trellis.config import TrellisConfig
-from trellis.gates import run_gate
-from trellis.review import LensResult, build_prompt, run_review
+from greenbar.config import GreenbarConfig
+from greenbar.gates import run_gate
+from greenbar.review import LensResult, build_prompt, run_review
 
 NOW = "2026-08-03T00:00:00+00:00"
 
 
 def _cfg(gates=None):
-    return TrellisConfig(axes={}, tiers={}, gates=gates or {}, path=None, raw={})
+    return GreenbarConfig(axes={}, tiers={}, gates=gates or {}, path=None, raw={})
 
 
 class TestPersonaFile:
@@ -94,7 +94,7 @@ class TestAdrGate:
 
 def test_pack_ships_five_design_rubrics():
     from pathlib import Path
-    import trellis
-    lenses = Path(trellis.__file__).parent / "templates" / "lenses"
+    import greenbar
+    lenses = Path(greenbar.__file__).parent / "templates" / "lenses"
     files = sorted(p.name for p in lenses.glob("design.*.md"))
     assert len(files) == 5

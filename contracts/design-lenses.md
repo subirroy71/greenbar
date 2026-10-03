@@ -1,6 +1,6 @@
 ---
-id: trellis-v0.6-design-lenses
-goal: "Add a design-phase review: a pack of 5 independent discipline lenses (abstraction-contracts, distributed-invariants, systems-simplicity, evolutionary-design, domain-model) + a `design` tier + a deterministic ADR gate, run BEFORE implementation · measurable: `trellis review --group design` runs only the design lenses and a `design` tier gates a design record + an ADR · constraint: lenses are discipline rubrics (not celebrity impersonations); tool-agnostic; dependency-light."
+id: greenbar-v0.6-design-lenses
+goal: "Add a design-phase review: a pack of 5 independent discipline lenses (abstraction-contracts, distributed-invariants, systems-simplicity, evolutionary-design, domain-model) + a `design` tier + a deterministic ADR gate, run BEFORE implementation · measurable: `greenbar review --group design` runs only the design lenses and a `design` tier gates a design record + an ADR · constraint: lenses are discipline rubrics (not celebrity impersonations); tool-agnostic; dependency-light."
 tier: scoped
 
 non_goals:
@@ -10,9 +10,9 @@ non_goals:
 
 acceptance:
   - { id: A1, must: "a lens can load its persona from a `persona_file`, so the 5-lens pack is reusable without inlining prompts" }
-  - { id: A2, must: "`trellis review --group design` runs ONLY lenses tagged group: design (code lenses excluded)" }
+  - { id: A2, must: "`greenbar review --group design` runs ONLY lenses tagged group: design (code lenses excluded)" }
   - { id: A3, must: "the `builtin: adr` gate passes iff an ADR exists in the configured dir and (when required) references the contract id; else fails with a clear reason" }
-  - { id: A4, must: "the 5 design persona files ship in the package and are copied by `trellis init`" }
+  - { id: A4, must: "the 5 design persona files ship in the package and are copied by `greenbar init`" }
   - { id: A5, must: "absent group / absent persona_file / absent ADR dir all degrade gracefully (no crash)" }
 
 quality_axes:
@@ -30,7 +30,7 @@ hitl:
   - "merge to main"
 ---
 
-# Trellis v0.6 — architecture design-lens pack
+# Greenbar v0.6 — architecture design-lens pack
 
 **Why.** Design is where a wrong call is cheapest to catch. This moves the multi-lens review
 *earlier* — onto the design doc, before code — with five independent lenses distilled from durable
@@ -45,7 +45,7 @@ from running them as separate passes (and, ideally, cross-model); where a school
 
 **How.** Lenses gain `persona_file` (load the rubric from the pack) and `group` (so
 `review --group design` runs only the design set). A `design` tier gates `[contract, adr,
-design-review]`. `trellis init` drops the 5 rubric files into `lenses/`.
+design-review]`. `greenbar init` drops the 5 rubric files into `lenses/`.
 
 **DO NOT.** Impersonate living people as authority; bundle a model checker into core; crash on a
 missing persona_file / group / ADR dir; auto-write ADRs (the gate only checks one exists).

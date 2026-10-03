@@ -1,8 +1,8 @@
 """The contract validator is the crown jewel — the rule that an asserted axis needs a behavioral
-KPI is the whole reason Trellis beats an advisory checklist. These tests pin every rule."""
+KPI is the whole reason Greenbar beats an advisory checklist. These tests pin every rule."""
 import pytest
 
-from trellis.contract import parse_contract, validate_contract, ContractError
+from greenbar.contract import parse_contract, validate_contract, ContractError
 
 # a project axis catalog: profile C has three axes
 CATALOG = {"C": ["correctness", "reasonableness", "performance"], "D": ["provenance"]}

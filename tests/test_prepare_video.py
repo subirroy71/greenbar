@@ -28,18 +28,18 @@ def test_prepare_writes_three_artifacts(tmp_path):
     out = tmp_path / "nb"
     pv.prepare("oss", "audio", 5, "calm", out)
     assert (out / "source-pack.md").exists()
-    assert "pip install trellis-loop" in (out / "prompt.txt").read_text()
+    assert "pip install greenbar" in (out / "prompt.txt").read_text()
     steps = (out / "STEPS.md").read_text()
     assert "notebooklm.google.com" in steps and "beat sheet" in steps.lower()
 
 
 def test_capture_cli_demo_runs_real_commands():
     # resolve the CLI from the running interpreter's env too, so this passes when the venv isn't on PATH
-    trellis = shutil.which("trellis") or str(Path(sys.executable).with_name("trellis"))
-    demo = pv.capture_cli_demo(trellis=trellis)
+    greenbar = shutil.which("greenbar") or str(Path(sys.executable).with_name("greenbar"))
+    demo = pv.capture_cli_demo(greenbar=greenbar)
     # every step header present, and real output for at least the read-only ones
     assert "orient" in demo and "MCP tools" in demo
-    assert "```console" in demo and "trellis_orient" in demo  # a real MCP tools/list response
+    assert "```console" in demo and "greenbar_orient" in demo  # a real MCP tools/list response
 
 
 def test_with_demo_adds_a_source(tmp_path):
