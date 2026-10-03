@@ -133,12 +133,19 @@ jobs:
           git config user.name "greenbar[bot]"
           git config user.email "greenbar-bot@users.noreply.github.com"
           git fetch origin 'refs/notes/greenbar:refs/notes/greenbar' 2>/dev/null || true
-          HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].head.sha // ""' 2>/dev/null || true)
+          # GitHub's API can hiccup; retry, and never mistake an error body for data.
+          api() { for i in 1 2 3; do out=$(gh api "$@" 2>/dev/null) && { printf '%s' "$out"; return 0; }; sleep $((i * 5)); done; return 1; }
+          PULLS=$(api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[].head.sha] | first // ""') \
+            || { echo "::error::GitHub API unavailable while finding the PR for $GITHUB_SHA — re-run this job"; exit 1; }
+          HEAD_SHA="$PULLS"
           if [ -z "$HEAD_SHA" ]; then
             echo "no PR for $GITHUB_SHA — a direct push is ungoverned; nothing to record"; exit 0
           fi
-          CONCLUSION=$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs" \
-            --jq '[.check_runs[] | select(.name == "greenbar")][0].conclusion // "missing"')
+          printf '%s' "$HEAD_SHA" | grep -Eq '^[0-9a-f]{40}$' \
+            || { echo "::error::unexpected PR head '$HEAD_SHA' — re-run this job"; exit 1; }
+          CONCLUSION=$(api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs" \
+            --jq '[.check_runs[] | select(.name == "greenbar")][0].conclusion // "missing"') \
+            || { echo "::error::GitHub API unavailable while reading the greenbar check — re-run this job"; exit 1; }
           OK=false; [ "$CONCLUSION" = "success" ] && OK=true
           EVENT=$(jq -nc --arg c "$GITHUB_SHA" --arg h "$HEAD_SHA" --arg s "$CONCLUSION" --argjson ok "$OK" \
             '{kind: "gate", ok: $ok, commit: $c, pr_head: $h, source: "pr-check", check: $s, gates: []}')
