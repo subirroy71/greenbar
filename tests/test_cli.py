@@ -16,8 +16,11 @@ def test_init_then_lint_then_gate(tmp_path, monkeypatch, capsys):
     # the shipped example contract is valid → lint exits 0
     assert main(["lint", str(contract)]) == 0
 
-    # gate 'trivial' only requires the contract gate → passes with a valid contract
-    assert main(["gate", "trivial", "--contract", str(contract)]) == 0
+    # a contract-only tier passes with the valid example contract (the stack gates — ruff/pytest —
+    # have nothing to check in an empty dir, so the test gates the contract alone, exit code included)
+    cfg = tmp_path / "greenbar.yaml"
+    cfg.write_text(cfg.read_text().replace("tiers:\n", "tiers:\n  contract-only: { gates: [contract] }\n", 1))
+    assert main(["gate", "contract-only", "--contract", str(contract)]) == 0
 
 
 def test_lint_fails_on_bad_contract(tmp_path, monkeypatch):

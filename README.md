@@ -8,12 +8,14 @@ Most "AI dev workflows" (and most human ones) *generate* rigor — a nice spec, 
 
 > Greenbar is a distilled, tool-agnostic, *enforced* generalization of a governed loop we ran in production — the practices are old (spec-driven dev, design-by-contract, TDD, quality gates, adversarial review); the contribution is making them **fail the build when absent.**
 
+> **Status: beta (v0.10).** The core works and gates its own repo, but it hasn't been battle-tested on other teams yet. **Looking for 3–5 design partners** — especially OSS maintainers flooded with AI-written PRs and teams that need an audit trail for agent changes. [Open an issue](https://github.com/subirroy71/greenbar/issues/new?title=Design%20partner%3A%20) and say what you'd want it to catch.
+
 ---
 
 ## The idea in 30 seconds
 
 1. **Contract** — every non-trivial change gets a `CONTRACT.md`: a machine-checked goal, *binary* acceptance criteria, and **quality axes with behavioral KPIs**. `greenbar lint` validates it.
-2. **Tiers** — a change declares its blast radius (`trivial` / `scoped` / `critical`). The tier fixes which gates are required, so rigor scales to impact instead of being all-or-nothing.
+2. **Tiers** — each change gets a blast radius (`trivial` / `scoped` / `critical`), declared or inferred from the diff. The tier fixes which gates are required, so rigor scales to impact instead of being all-or-nothing. Docs-only changes are *light*: linted and tested, no contract needed.
 3. **Gates** — `greenbar gate <tier>` runs the required checks (the contract linter, your lint/types/tests/coverage, a required review record, …) and **exits non-zero if any fail.** Wire it into CI + branch protection and the process is enforced.
 
 The signature rule: **an asserted quality axis must carry a behavioral must-have KPI, or be explicitly deferred / marked n/a with a sign-off.** "We'll handle accuracy" is not a plan; a linter now says so.
@@ -23,16 +25,17 @@ The signature rule: **an asserted quality axis must carry a behavioral must-have
 ```bash
 pipx install greenbar                 # or: pip install greenbar
 cd your-repo
-greenbar init --preset python              # gated for your stack in one command (python|node|go|rust)
-greenbar draft docs/PRD.md                 # scaffold a contract FROM your PRD (no blank page)
-$EDITOR contracts/<id>.md                 # fill the TODO targets — lint rejects any left behind
+greenbar init --preset python --agent claude-code   # stack gates + agent instructions (python|node|go|rust; claude-code|cursor)
+claude mcp add greenbar -- greenbar mcp      # optional: let the agent call the gates mid-task
+greenbar draft docs/PRD.md                   # a starting contract FROM your PRD (no blank page)
+$EDITOR contracts/<id>.md                    # fill the TODO targets — lint rejects any left behind
 greenbar lint contracts/<id>.md
 greenbar gate --auto --contract contracts/<id>.md   # classify the diff, run the right tier
 ```
 
-**`greenbar draft`** turns a PRD/issue into a starting contract — pulling the goal, non-goals, and acceptance stubs out of the text and filling the quality axes from your project catalog, so you edit instead of stare at a blank frontmatter. It works with **no LLM** by default; `greenbar draft PRD.md --with "claude -p"` uses a model CLI (provider-agnostic), falling back to the deterministic draft if that fails.
+**`greenbar draft`** turns a PRD/issue into a starting contract — pulling the goal, non-goals, and acceptance stubs out of the text (heuristically) and filling the quality axes from your project catalog, so you edit instead of stare at a blank frontmatter. The KPI targets are left as `TODO`s on purpose: the draft fails lint until a human states how quality will be measured. It works with **no LLM** by default; `greenbar draft PRD.md --with "claude -p"` uses a model CLI (provider-agnostic), falling back to the deterministic draft if that fails.
 
-**`greenbar init --preset <stack>`** writes a `greenbar.yaml` with your stack's gate commands (ruff/pytest, eslint/tsc, go vet/test, cargo clippy/test) + the tier ladder + the design-lens pack — no hand-written YAML to start.
+**`greenbar init --preset <stack>`** writes a `greenbar.yaml` with your stack's gate commands (ruff/pytest, eslint/tsc, go vet/test, cargo clippy/test) + the tier ladder + the design-lens pack — no hand-written YAML to start. `--agent claude-code` / `--agent cursor` installs the agent instructions where each tool loads them (`.claude/skills/greenbar/`, `.cursor/rules/greenbar.mdc`).
 
 In CI (a change cannot merge unless its tier is green):
 
@@ -49,7 +52,7 @@ In CI (a change cannot merge unless its tier is green):
 Drop in the shipped workflow (`src/greenbar/templates/github/greenbar-pr.yml` → `.github/workflows/`). On every PR it runs `greenbar gate --auto` as a **required check that blocks merge**, then upserts **one** comment (never spams) with the gate table + review findings — using only the repo's `GITHUB_TOKEN`:
 
 ```markdown
-## 🌿 Greenbar
+## 🟩 Greenbar
 **Gate `critical`: ✅ pass**
 | gate | result |  |
 |---|---|
@@ -117,18 +120,18 @@ axes:                       # the quality-axis catalog per profile (yours to def
   C: [correctness, reasonableness, performance]
   D: [provenance, consistency, correctness, freshness]
 tiers:                      # blast-radius ladder
-  trivial:  { gates: [contract] }
+  trivial:  { gates: [lint, test] }              # light mode: docs-only changes, no contract
   scoped:   { gates: [contract, lint, test] }
-  critical: { gates: [contract, lint, test, coverage, review-record] }
+  critical: { gates: [contract, lint, test, coverage, review] }
 gates:
   contract:      { builtin: contract }
   lint:          { run: "ruff check ." }        # swap for your linter
   test:          { run: "pytest -q" }
   coverage:      { run: "pytest -q --cov --cov-fail-under=70" }
-  review-record: { requires_file: ".greenbar/review-record.json" }
+  review:        { builtin: review, fail_on_rubber_stamp: true }
 ```
 
-Gate kinds: `builtin: contract` (the contract validator), `builtin: review` (a fresh, non-BLOCK review record must exist), `run:` (any command that exits 0 on pass), `requires_file:` (an artifact must exist).
+Gate kinds: `builtin: contract` (the contract validator), `builtin: review` (a fresh, non-BLOCK review record must exist), `builtin: adr` (a decision record must exist), `run:` (any command that exits 0 on pass; times out after `timeout_s`, default 1800s), `requires_file:` (an artifact must exist). A tier with no gates fails — it can never read as green.
 
 ## Review panel — `greenbar review`
 
@@ -141,10 +144,10 @@ lenses:
     command: "ruff check . && mypy src"
     deterministic: true
   - name: correctness                              # an LLM lens on model A
-    command: "claude -p --model claude-sonnet-4"
+    command: "claude -p --model claude-sonnet-5"
     persona: "Rigorous correctness reviewer. Trace every changed path."
   - name: security                                 # an LLM lens on model B (cross-model)
-    command: "llm -m gpt-4o"
+    command: "llm -m <a-model-from-another-vendor>"
     persona: "Security auditor. Hunt auth/secret/injection."
 ```
 
@@ -153,7 +156,7 @@ greenbar review --contract contracts/CONTRACT.md   # runs lenses in parallel →
 greenbar gate critical --contract contracts/CONTRACT.md   # the `review` gate consumes it
 ```
 
-Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **context hash** (prove which tree was reviewed), and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing**, **stale** (the contract *or any tracked file* changed since the review — checked against a content fingerprint of the tree, so committing the reviewed code keeps it fresh), **BLOCKED**, or ran **zero lenses** — so a review of an old version can't wave a change through.
+Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **content fingerprint** of the reviewed tree, and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing**, **stale** (the contract *or any tracked file* changed since the review — checked against a content fingerprint of the tree, so committing the reviewed code keeps it fresh), **BLOCKED**, or ran **zero lenses** — so a review of an old version can't wave a change through.
 
 ## Design-phase review — an architecture lens pack
 
@@ -215,8 +218,8 @@ classify:
   rules:
     - { tier: critical, any_path: ["**/migrations/**", "**/auth/**", "**/*secret*"] }
     - { tier: critical, min_files: 30 }
-    - { tier: trivial,  only_paths: ["**/*.md", "docs/**"] }
-    - { tier: trivial,  max_files: 1, max_lines: 10 }
+    - { tier: scoped,   any_path: ["contracts/**"] }          # touching a contract → it gets linted
+    - { tier: trivial,  only_paths: ["**/*.md", "**/*.rst"] } # light mode: prose docs need no contract
 ```
 
 ```bash
@@ -224,7 +227,7 @@ greenbar classify                 # → tier: critical  (rule[0] matched {any_pa
 greenbar gate --auto --contract contracts/CONTRACT.md   # classify, then run the inferred tier
 ```
 
-So a docs typo runs the `trivial` gates and a migration change runs `critical` — rigor scales to impact automatically.
+So a docs typo runs the light `trivial` tier (lint + tests, no contract) and a migration change runs `critical` — rigor scales to impact automatically. Light mode is deliberately docs-only: any code change needs a contract, so an agent can't dodge the contract by splitting work into tiny PRs.
 
 **Measure whether the loop is paying.** Every `gate`/`review` appends to `.greenbar/history.jsonl` (`greenbar gate --notes` also writes the result as a git note, for CI where the file doesn't survive); `greenbar report` aggregates both:
 
@@ -237,13 +240,13 @@ signals:
   ⚠ over half of reviews were all-SIGN with zero findings — possible rubber-stamping
 ```
 
-Proxies (defect-escape) are labelled as proxies — no overclaiming.
+**Does it actually catch defects?** `greenbar accountability` reports the **defect-escape rate**: of the changes that passed every gate, how many were later reverted (optionally plus commits you flag as incident-linked). It's a revert-based **proxy** — not every revert is a defect, not every defect is reverted — and it says so; commits Greenbar never gated count as *ungoverned*, never as escapes.
 
 ## How this compares
 
 | | Advisory doc / checklist | AI reviewer bot (post-PR) | **Greenbar** |
 |---|---|---|---|
-| Enforced? | No — honor system | Comments, rarely blocking | **Yes — gate exits non-zero** |
+| Enforced? | No — honor system | Mostly advisory comments | **Yes — gate exits non-zero** |
 | Contract validated by | a human reading it | n/a | **a linter** |
 | Rigor scales to blast radius | no | no | **tiers** |
 | Tool-locked | — | usually SaaS | **tool-agnostic (CLI + Action)** |
@@ -262,15 +265,15 @@ Greenbar isn't a code reviewer — it's the layer that guarantees the reviewer, 
 - **v0.7:** onboarding — `greenbar draft` (contract from a PRD, deterministic or `--with` a model CLI) + `greenbar init --preset python|node|go|rust` (stack-gated in one command). ✅
 - **v0.8:** `greenbar accountability` — defect-escape rate (gate-passed changes later reverted), the "does the loop pay?" metric, honest by construction. ✅
 - **v0.9:** PR-native — `greenbar render` + a shipped GitHub workflow: a required gate check that blocks merge and one upserted PR comment (gate table + review findings), no hosted service. ✅
-- **v0.10:** agent-native — `greenbar mcp`, a pure-stdlib MCP server exposing orient/lint/classify/draft/gate/report as tools any coding agent (Claude Code, Cursor) can call. ✅
-- **v0.11 (ideas):** shareable policy packs (`soc2`, `fintech`, `oss-maintainer`).
+- **v0.10:** agent-native — `greenbar mcp`, a pure-stdlib MCP server exposing orient/lint/classify/draft/gate/report as tools any coding agent (Claude Code, Cursor) can call — plus pre-release enforcement hardening, docs-only light mode, `init --agent`, and the rename from Trellis. ✅
+- **Next (shaped by design partners):** shareable policy packs (`soc2`, `fintech`, `oss-maintainer`); Spec Kit / OpenSpec specs as contract sources; agent-boundary hooks so the same policy runs at agent, commit, and CI.
 
 ## Adapters
 
-Wire the loop into your agentic coding tool so the agent authors a contract and runs the gates before pushing:
-- `adapters/claude-code/` — a Claude Code skill + `CLAUDE.md` snippet
-- `adapters/cursor/` — Cursor rules
+Wire the loop into your agentic coding tool so the agent authors a contract and runs the gates before pushing — `greenbar init --agent claude-code` / `--agent cursor` installs them:
+- Claude Code — a project skill (`.claude/skills/greenbar/SKILL.md`)
+- Cursor — a project rule (`.cursor/rules/greenbar.mdc`); the same text works as Windsurf/Cline rules
 
 ## License
 
-Apache-2.0. Contributions welcome — see `CONTRIBUTING.md`. Greenbar dogfoods itself: this repo has its own `greenbar.yaml` + `contracts/CONTRACT.md`, and CI runs `greenbar gate scoped` on every PR.
+Apache-2.0. Contributions welcome — see `CONTRIBUTING.md`. Greenbar dogfoods itself: this repo has its own `greenbar.yaml` and a contract per change under `contracts/`, CI gates every push against the current one, and PRs run the shipped PR workflow.

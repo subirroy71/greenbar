@@ -18,6 +18,7 @@ Config (in greenbar.yaml):
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -56,6 +57,27 @@ class DiffStat:
         return self.added + self.removed
 
 
+_BRACE_RENAME = re.compile(r"^(.*)\{(.*) => (.*)\}(.*)$")
+
+
+def _rename_paths(path: str) -> List[str]:
+    """Expand numstat rename notation to BOTH paths — a code file renamed to `.md` must still count
+    as code. Handles `old => new` and `pre/{old => new}/post`."""
+    m = _BRACE_RENAME.match(path)
+    if m:
+        pre, old, new, post = m.groups()
+        return [re.sub(r"//+", "/", f"{pre}{old}{post}"), re.sub(r"//+", "/", f"{pre}{new}{post}")]
+    if " => " in path:
+        old, new = path.split(" => ", 1)
+        return [old, new]
+    return [path]
+
+
+def _add(files: List[str], path: str) -> None:
+    if path and path != "/dev/null" and path not in files:
+        files.append(path)
+
+
 def parse_numstat(text: str) -> DiffStat:
     """Parse `git diff --numstat` output: `<added>\\t<removed>\\t<path>` (binary → `-`)."""
     files: List[str] = []
@@ -67,34 +89,88 @@ def parse_numstat(text: str) -> DiffStat:
             d = 0 if parts[1] in ("-", "") else int(parts[1])
             added += a
             removed += d
-            files.append(parts[2])
+            for path in _rename_paths(parts[2]):
+                _add(files, path)
     return DiffStat(files, added, removed)
 
 
 def parse_unified_diff(text: str) -> DiffStat:
-    """Extract files + added/removed line counts from a unified diff (for `--diff <file>`)."""
+    """Extract files + added/removed line counts from a unified diff (for `--diff <file>`).
+
+    Old paths count too (`--- a/…`, `rename from …`): deleting or renaming a code file is a code
+    change, even if the only new path is a doc."""
     files: List[str] = []
     added = removed = 0
+    # A hunk's @@ header says how many old/new lines follow; counting them down tells us exactly
+    # where the hunk ends, so a removed "-- sql comment" is never read as a header and the next
+    # file's headers are never read as content — with or without `diff --git` lines.
+    old_left = new_left = 0
     for line in text.splitlines():
-        if line.startswith("+++ "):
-            path = line[4:].strip()
-            if path.startswith("b/"):
+        if old_left > 0 or new_left > 0:
+            if line.startswith("\\"):
+                continue  # "\ No newline at end of file"
+            if line.startswith("+"):
+                added += 1
+                new_left -= 1
+            elif line.startswith("-"):
+                removed += 1
+                old_left -= 1
+            else:
+                old_left -= 1
+                new_left -= 1
+            continue
+        hunk = re.match(r"@@ (-\d+(?:,(\d+))? )?\+\d+(?:,(\d+))? @@", line)
+        if hunk:
+            # an omitted count means 1; an omitted old range (`@@ +1 @@`) means no old lines
+            old_left = 0 if hunk.group(1) is None else int(hunk.group(2) or 1)
+            new_left = int(hunk.group(3) or 1)
+        elif line.startswith("diff --git "):
+            m = re.match(r"diff --git a/(.+?) b/(.+)$", line)
+            if m:  # covers empty added/deleted files, which carry no ---/+++ lines
+                _add(files, m.group(1))
+                _add(files, m.group(2))
+        elif line.startswith("+++ ") or line.startswith("--- "):
+            path = line[4:].strip().split("\t")[0]
+            if path[:2] in ("a/", "b/"):
                 path = path[2:]
-            if path and path != "/dev/null":
-                files.append(path)
-        elif line.startswith("+") and not line.startswith("+++"):
-            added += 1
-        elif line.startswith("-") and not line.startswith("---"):
-            removed += 1
+            _add(files, path)
+        elif line.startswith("rename from ") or line.startswith("rename to "):
+            _add(files, line.split(" ", 2)[2].strip())
     return DiffStat(files, added, removed)
 
 
 def git_numstat(base: Optional[str] = None) -> DiffStat:
-    cmd = ["git", "diff", "--numstat"] + ([f"{base}...HEAD"] if base else ["HEAD"])
+    # --no-renames: a rename is reported as delete + add, so both the old and new path are seen
+    # core.quotepath=off: non-ASCII paths (docs/café.md) arrive unquoted, so globs match them
+    cmd = (["git", "-c", "core.quotepath=off", "diff", "--numstat", "--no-renames"]
+           + ([f"{base}...HEAD"] if base else ["HEAD"]))
     try:
-        return parse_numstat(subprocess.run(cmd, capture_output=True, text=True).stdout)
+        stat = parse_numstat(subprocess.run(cmd, capture_output=True, text=True).stdout)
     except Exception:  # noqa: BLE001 — no git / not a repo → empty
         return DiffStat([], 0, 0)
+    if not base:
+        # the working tree also holds untracked new files — a new code file beside a doc edit is a
+        # code change. (A base..HEAD range only contains committed files, so CI needs no extra.)
+        # Listed from the repo top so a subdirectory cwd can't hide untracked files elsewhere.
+        try:
+            top = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                                 capture_output=True, text=True).stdout.strip()
+            out = subprocess.run(["git", "-c", "core.quotepath=off", "ls-files", "--others",
+                                  "--exclude-standard"], capture_output=True, text=True,
+                                 cwd=top or None).stdout
+        except Exception:  # noqa: BLE001
+            top, out = "", ""
+        for path in out.splitlines():
+            if path.startswith(".greenbar/"):
+                continue  # Greenbar's own local state is never part of the change
+            if path.strip() and path not in stat.files:
+                stat.files.append(path)
+                try:
+                    with open(os.path.join(top, path) if top else path, "rb") as fh:
+                        stat.added += sum(1 for _ in fh)
+                except OSError:
+                    pass
+    return stat
 
 
 def _match_any(globs, files) -> bool:

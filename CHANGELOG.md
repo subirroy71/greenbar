@@ -36,6 +36,22 @@ First tagged and PyPI-published release (v0.1–v0.9 were developed on `main` bu
   reach the shell via env vars, not `${{ }}` interpolation.
 
 ### Added
+- **Light mode:** in every preset the `trivial` tier needs no contract (still lint + test), and
+  only prose-doc diffs (`.md`/`.rst`) classify as trivial — any code change, even under `docs/`, needs a contract, so an agent can't
+  dodge one by splitting work into tiny PRs. A diff touching `contracts/` classifies as `scoped`
+  so the contract gets linted. A tier with no gates now fails rather than passing vacuously.
+- `greenbar init --agent claude-code|cursor` installs the agent instructions where each tool loads
+  them (`.claude/skills/greenbar/SKILL.md`, `.cursor/rules/greenbar.mdc`) and prints the
+  `claude mcp add` line.
+- Classification counts old paths: renames (`git diff --no-renames`, numstat `=>` notation,
+  unified-diff `rename from`) and deletions include the original path, so moving or deleting code
+  can never read as a docs-only change. Local classification includes untracked files; the
+  unified-diff parser sees empty added/deleted files and no longer mistakes a removed `-- ` line
+  for a file header; edits to reviewer prompts (`**/lenses/**`) and agent
+  instructions (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `.cursor/`) are scoped, never light. `init` adds `.greenbar/` to
+  `.gitignore`.
+- `greenbar draft` reads the goal from a `## Goal` (or `## Objective` / `## Problem`) section when
+  the PRD has no labelled goal line.
 - Durable gate history for `accountability`: `greenbar gate --notes` writes the event as a git note
   (`refs/notes/greenbar`); `report`/`accountability` read notes plus the local file (`--no-notes`
   to skip). `GREENBAR_COMMIT` overrides HEAD (PR runs use the head SHA, not GitHub's synthetic

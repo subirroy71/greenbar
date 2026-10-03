@@ -4,7 +4,8 @@
 # Contract binding: a PR declares its contract with a line in the PR description
 #   Greenbar-Contract: contracts/<id>.md
 # or by adding/changing exactly one contracts/*.md file. No contract → the contract gate fails
-# (it never falls back to some other contract).
+# (it never falls back to some other contract). Tiers without a contract gate — `trivial` in the
+# presets — need none, so docs and tiny fixes stay light.
 #
 # Policy pinning: gates run with the BASE branch's greenbar.yaml, so a PR can't loosen the policy
 # that judges it. Protect greenbar.yaml with CODEOWNERS so policy changes get a deliberate review.
@@ -54,7 +55,7 @@ jobs:
           if [ -n "$CONTRACT" ] && [ ! -f "$CONTRACT" ]; then
             echo "::warning::declared contract $CONTRACT does not exist"; CONTRACT=""
           fi
-          [ -z "$CONTRACT" ] && echo "::warning::no contract bound to this PR — the contract gate will fail"
+          [ -z "$CONTRACT" ] && echo "::notice::no contract bound to this PR — fine for a light (trivial) change; a tier with a contract gate will fail"
           echo "contract=$CONTRACT" >> "$GITHUB_OUTPUT"
 
           POLICY="$RUNNER_TEMP/greenbar-policy.yaml"
@@ -88,7 +89,7 @@ jobs:
           greenbar gate --auto --config "$POLICY" --diff-base "$BASE" "${ARGS[@]}" -v
 
       - name: Render comment
-        run: greenbar render --out .greenbar/pr-comment.md || printf '## 🌿 Greenbar\n_render failed_\n<!-- greenbar-report -->\n' > .greenbar/pr-comment.md
+        run: greenbar render --out .greenbar/pr-comment.md || printf '## 🟩 Greenbar\n_render failed_\n<!-- greenbar-report -->\n' > .greenbar/pr-comment.md
 
       - name: Upsert PR comment
         uses: actions/github-script@v7

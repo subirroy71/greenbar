@@ -110,8 +110,43 @@ def _cmd_init(args) -> int:
                 copied += 1
         if copied:
             print(f"greenbar: wrote {copied} design-lens rubric(s) into {ldir}/")
+    gitignore = dest / ".gitignore"
+    existing = gitignore.read_text() if gitignore.exists() else ""
+    if ".greenbar/" not in existing.split():
+        sep = "" if not existing or existing.endswith("\n") else "\n"
+        gitignore.write_text(existing + sep + ".greenbar/\n")
+        print(f"greenbar: added .greenbar/ (local run state) to {gitignore}")
+    for agent in getattr(args, "agent", None) or []:
+        _install_agent_adapter(dest, agent)
     print("next: edit the contract, then `greenbar lint contracts/CONTRACT.example.md`")
+    print("      let your agent call the gates mid-task:  claude mcp add greenbar -- greenbar mcp")
+    if not getattr(args, "agent", None):
+        print("      (add `--agent claude-code` or `--agent cursor` to install the agent instructions)")
     return 0
+
+
+_AGENT_TARGETS = {
+    # where each tool auto-loads project instructions
+    "claude-code": (Path("adapters/claude-code/SKILL.md"), Path(".claude/skills/greenbar/SKILL.md")),
+    "cursor": (Path("adapters/cursor/greenbar.rules.md"), Path(".cursor/rules/greenbar.mdc")),
+}
+
+
+def _install_agent_adapter(dest: Path, agent: str) -> None:
+    src_rel, tgt_rel = _AGENT_TARGETS[agent]
+    tgt = dest / tgt_rel
+    if tgt.exists() or tgt.is_symlink():  # a dangling symlink would otherwise be written through
+        print(f"greenbar: {tgt} already exists — leaving it")
+        return
+    body = (_TEMPLATES / src_rel).read_text()
+    if agent == "cursor":
+        # a Cursor project rule: frontmatter + the rules, minus the manual "paste this" line
+        lines = [ln for ln in body.splitlines() if not ln.startswith("Paste into")]
+        body = ("---\ndescription: Greenbar contract-first loop — author, lint and gate every "
+                "non-trivial change\nalwaysApply: true\n---\n" + "\n".join(lines).strip() + "\n")
+    tgt.parent.mkdir(parents=True, exist_ok=True)
+    tgt.write_text(body)
+    print(f"greenbar: wrote {tgt} ({agent} instructions)")
 
 
 def _cmd_lint(args) -> int:
@@ -316,6 +351,8 @@ def build_parser() -> argparse.ArgumentParser:
     pi = sub.add_parser("init", help="scaffold greenbar.yaml + a contract template")
     pi.add_argument("path", nargs="?", help="target directory (default: .)")
     pi.add_argument("--preset", help="stack preset for gates: python | node | go | rust")
+    pi.add_argument("--agent", action="append", choices=sorted(_AGENT_TARGETS),
+                    help="install agent instructions: claude-code | cursor (repeatable)")
     pi.set_defaults(func=_cmd_init)
 
     pd = sub.add_parser("draft", help="scaffold a contract from a PRD")

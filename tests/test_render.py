@@ -52,7 +52,7 @@ class TestRenderCLI:
         (tmp_path / ".greenbar" / "review-record.json").write_text(json.dumps(_review()))
         assert main(["render"]) == 0
         out = capsys.readouterr().out
-        assert "🌿 Greenbar" in out and "Code review" in out and MARKER in out
+        assert "🟩 Greenbar" in out and "Code review" in out and MARKER in out
 
     def test_render_out_file(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)

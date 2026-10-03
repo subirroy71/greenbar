@@ -2,7 +2,7 @@
 axes:
   C: [correctness, reasonableness]
 tiers:
-  trivial: { gates: [contract] }
+  trivial: { gates: [test] }   # light mode: no contract for docs / tiny fixes
   scoped:  { gates: [contract, test] }
 gates:
   contract: { builtin: contract }

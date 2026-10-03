@@ -4,7 +4,7 @@ axes:
   D: [provenance, consistency, correctness, freshness]
 tiers:
   design:   { gates: [contract, adr, design-review] }
-  trivial:  { gates: [contract] }
+  trivial:  { gates: [lint, test] }        # light mode: no contract for docs / tiny fixes — still linted + tested
   scoped:   { gates: [contract, vet, lint, test] }
   critical: { gates: [contract, vet, lint, test, cover, review] }
 gates:
@@ -21,8 +21,8 @@ classify:
   rules:
     - { tier: critical, any_path: ["**/migrations/**", "**/auth*", "**/*secret*", "**/security/**"] }
     - { tier: critical, min_files: 30 }
-    - { tier: trivial,  only_paths: ["**/*.md", "docs/**"] }
-    - { tier: trivial,  max_files: 1, max_lines: 10 }
+    - { tier: scoped,   any_path: ["contracts/**", "**/lenses/**", "CLAUDE.md", "AGENTS.md", ".claude/**", ".cursor/**"] }   # contracts get linted; reviewer + agent instructions are policy
+    - { tier: trivial,  only_paths: ["**/*.md", "**/*.rst"] }   # light mode: docs only — any code change needs a contract
 review:
   parallelism: 4
   timeout_s: 300
