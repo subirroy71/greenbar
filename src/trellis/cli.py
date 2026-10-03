@@ -17,12 +17,14 @@ from pathlib import Path
 import subprocess
 from datetime import datetime, timezone
 
+import yaml
+
 from . import __version__
 from .classify import DiffStat, classify, git_numstat, parse_unified_diff
 from .config import load_config
-from .contract import load_contract, validate_contract
-from .gates import run_tier
-from .history import read_events, record_event
+from .contract import ContractError, load_contract, validate_contract
+from .gates import gate_event, run_tier
+from .history import current_commit, read_all_events, read_events, record_event, record_note
 from .report import aggregate, format_report
 from .review import run_review
 
@@ -44,14 +46,6 @@ def _resolve_diff_stat(args) -> DiffStat:
     if getattr(args, "diff", None):
         return parse_unified_diff(Path(args.diff).read_text())
     return git_numstat(getattr(args, "diff_base", None))
-
-
-def _git_head() -> str | None:
-    try:
-        out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
-        return out.stdout.strip() or None
-    except Exception:  # noqa: BLE001
-        return None
 
 
 def _git_commits(limit: int = 2000):
@@ -122,8 +116,14 @@ def _cmd_init(args) -> int:
 
 def _cmd_lint(args) -> int:
     cfg = load_config(args.config)
-    meta, _ = load_contract(args.contract)
-    findings = validate_contract(meta, cfg.axes)
+    try:
+        meta, _ = load_contract(args.contract)
+    except (ContractError, OSError, yaml.YAMLError) as exc:
+        # a malformed contract is a lint failure with a clear message, never a traceback
+        print(f"[error] C000: cannot parse {args.contract}: {exc}")
+        print(f"\ntrellis lint {args.contract}: 1 error(s), 0 warning(s)")
+        return 1
+    findings = validate_contract(meta, cfg.axes, tiers=list(cfg.tiers))
     for x in findings:
         print(x)
     errors = [x for x in findings if x.level == "error"]
@@ -145,11 +145,10 @@ def _cmd_gate(args) -> int:
         if (args.verbose or not r.ok) and r.detail:
             print("\n".join("    " + line for line in r.detail.splitlines()))
     print(f"\ntrellis gate '{tier}': {len(results) - len(failed)}/{len(results)} passed")
-    record_event({
-        "kind": "gate", "tier": tier, "contract": args.contract, "ok": not failed,
-        "commit": _git_head(),   # links a later revert of this commit back to its gate result
-        "gates": [{"name": r.name, "ok": r.ok} for r in results],
-    })
+    event = gate_event(tier, args.contract, results, current_commit())
+    record_event(event)
+    if args.notes and not record_note(event, event["commit"]):
+        print("trellis: could not write the git note (not a git repo, or no commit?)")
     return 1 if failed else 0
 
 
@@ -173,7 +172,7 @@ def _cmd_review(args) -> int:
         "lens_count": m["lens_count"], "finding_count": m["finding_count"],
         "all_sign_no_findings": m["all_sign_no_findings"],
     })
-    return 1 if s["verdict"] == "BLOCKED" else 0
+    return 1 if s["verdict"] in ("BLOCKED", "NO_LENSES") else 0
 
 
 def _cmd_classify(args) -> int:
@@ -188,7 +187,8 @@ def _cmd_classify(args) -> int:
 
 def _cmd_report(args) -> int:
     import json as _json
-    agg = aggregate(read_events(args.history))
+    events = read_events(args.history) if args.no_notes else read_all_events(args.history)
+    agg = aggregate(events)
     if args.json:
         print(_json.dumps(agg, indent=2))
     else:
@@ -237,7 +237,8 @@ def _cmd_accountability(args) -> int:
     if args.incidents:
         incidents = [l.strip().split()[0] for l in Path(args.incidents).read_text().splitlines()
                      if l.strip() and not l.strip().startswith("#")]
-    rep = compute(read_events(args.history), _git_commits(), incidents=incidents,
+    events = read_events(args.history) if args.no_notes else read_all_events(args.history)
+    rep = compute(events, _git_commits(), incidents=incidents,
                   window_days=args.window_days)
     if args.json:
         print(_json.dumps(asdict(rep), indent=2))
@@ -339,6 +340,8 @@ def build_parser() -> argparse.ArgumentParser:
     pg.add_argument("--diff-base", help="git ref to diff against for --auto")
     pg.add_argument("--config", help="path to trellis.yaml")
     pg.add_argument("-v", "--verbose", action="store_true", help="print detail for passing gates too")
+    pg.add_argument("--notes", action="store_true",
+                    help="also record the result as a git note (refs/notes/trellis) on the gated commit")
     pg.set_defaults(func=_cmd_gate)
 
     pc = sub.add_parser("classify", help="infer a change's tier from its diff")
@@ -350,6 +353,7 @@ def build_parser() -> argparse.ArgumentParser:
     prep = sub.add_parser("report", help="aggregate the gate/review history")
     prep.add_argument("--history", default=".trellis/history.jsonl")
     prep.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    prep.add_argument("--no-notes", action="store_true", help="ignore git-notes history (local file only)")
     prep.set_defaults(func=_cmd_report)
 
     prn = sub.add_parser("render", help="render the latest gate + review artifacts as a Markdown PR comment")
@@ -363,6 +367,7 @@ def build_parser() -> argparse.ArgumentParser:
     pa.add_argument("--incidents", help="file of commit SHAs (one per line) known to be defective")
     pa.add_argument("--window-days", type=float, help="only attribute a revert within N days of merge")
     pa.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    pa.add_argument("--no-notes", action="store_true", help="ignore git-notes history (local file only)")
     pa.set_defaults(func=_cmd_accountability)
 
     pr = sub.add_parser("review", help="run the configured lenses and write a review record")

@@ -22,8 +22,8 @@ The signature rule: **an asserted quality axis must carry a behavioral must-have
 pipx install trellis-loop                 # or: pip install trellis-loop
 cd your-repo
 trellis init --preset python              # gated for your stack in one command (python|node|go|rust)
-trellis draft docs/PRD.md                 # scaffold a lint-clean contract FROM your PRD (no blank page)
-$EDITOR contracts/<id>.md                 # fill the TODO targets
+trellis draft docs/PRD.md                 # scaffold a contract FROM your PRD (no blank page)
+$EDITOR contracts/<id>.md                 # fill the TODO targets — lint rejects any left behind
 trellis lint contracts/<id>.md
 trellis gate --auto --contract contracts/<id>.md   # classify the diff, run the right tier
 ```
@@ -36,10 +36,10 @@ In CI (a change cannot merge unless its tier is green):
 
 ```yaml
 # .github/workflows/trellis.yml
-- uses: your-org/trellis-action@v1
+- uses: subirroy71/trellis/action@v0.10.0
   with:
     tier: scoped
-    contract: contracts/CONTRACT.md
+    contract: contracts/<id>.md
 ```
 
 ### PR-native — a required check + one comment (no hosted service)
@@ -58,6 +58,12 @@ Drop in the shipped workflow (`src/trellis/templates/github/trellis-pr.yml` → 
 ```
 
 `trellis render` produces that Markdown from the local artifacts (CLI renders; the Action posts) — so a hosted GitHub App is unnecessary.
+
+The workflow is built so a PR can't game its own check:
+
+- **Contract binding.** A PR declares its contract with a `Trellis-Contract: contracts/<id>.md` line in its description, or by adding/changing exactly one contract. With none, the contract gate fails — it never falls back to some other contract.
+- **Policy pinning.** Gates run with the **base branch's** `trellis.yaml`, so a PR can't delete a gate or set `run: "true"` to pass. Add a `CODEOWNERS` entry for `trellis.yaml` so policy changes get a deliberate review.
+- **Durable accountability.** After merge, a `record` job stores the PR's check result as a git note (`refs/notes/trellis`) on the commit that actually landed, so `trellis accountability` works from any clone (`git fetch origin refs/notes/trellis:refs/notes/trellis`) even though CI runners are ephemeral.
 
 ### Agent-native — an MCP server (no SDK dependency)
 
@@ -145,7 +151,7 @@ trellis review --contract contracts/CONTRACT.md   # runs lenses in parallel → 
 trellis gate critical --contract contracts/CONTRACT.md   # the `review` gate consumes it
 ```
 
-Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **context hash** (prove which tree was reviewed), and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing, stale** (the contract changed since the review), or **BLOCKED** — so a review of an old version can't wave a change through.
+Each lens gets the persona + contract + diff on stdin and ends with `{"verdict":"SIGN|SIGN_WITH_CHANGE|BLOCK","findings":[...]}`. The record is **fail-closed** (a lens that times out or emits no parseable verdict is `ERROR`, never a silent SIGN), carries a **context hash** (prove which tree was reviewed), and computes a **rubber-stamp signal** (all-SIGN with zero findings). The `review` gate fails if the record is **missing**, **stale** (the contract *or any tracked file* changed since the review — checked against a content fingerprint of the tree, so committing the reviewed code keeps it fresh), **BLOCKED**, or ran **zero lenses** — so a review of an old version can't wave a change through.
 
 ## Design-phase review — an architecture lens pack
 
@@ -218,7 +224,7 @@ trellis gate --auto --contract contracts/CONTRACT.md   # classify, then run the 
 
 So a docs typo runs the `trivial` gates and a migration change runs `critical` — rigor scales to impact automatically.
 
-**Measure whether the loop is paying.** Every `gate`/`review` appends to `.trellis/history.jsonl`; `trellis report` aggregates it:
+**Measure whether the loop is paying.** Every `gate`/`review` appends to `.trellis/history.jsonl` (`trellis gate --notes` also writes the result as a git note, for CI where the file doesn't survive); `trellis report` aggregates both:
 
 ```
 $ trellis report

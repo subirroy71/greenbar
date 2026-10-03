@@ -10,6 +10,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
-      # Trellis gates itself: the 'scoped' tier = [contract, test].
+      # Trellis gates itself: the 'scoped' tier = [contract, test], against the contract of the
+      # change in flight (update this path with each release's contract).
       # A bad contract or a failing test exits non-zero and blocks the merge.
-      - run: trellis gate scoped --contract contracts/CONTRACT.md -v
+      - run: trellis gate scoped --contract contracts/enforcement-hardening.md -v

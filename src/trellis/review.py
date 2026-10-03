@@ -7,17 +7,22 @@ code instead. Trellis calls no LLM directly — it orchestrates whatever command
 cross-model review is just "different command per lens", and the tool stays dependency-light.
 
 Fail-closed: a lens that times out, crashes, or emits no parseable verdict is recorded as ERROR —
-never a silent SIGN. The record carries a context hash so you can prove which tree was reviewed.
+never a silent SIGN, and a run with zero lenses is NO_LENSES (a failure), never a vacuous PASS.
+The record carries a content fingerprint of the reviewed tree, and the gate re-derives it: a
+review of older code can't wave a newer change through.
 """
 from __future__ import annotations
 
 import concurrent.futures
 import hashlib
 import json
+import os
+import shutil
 import subprocess
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, Iterable, List, Optional
 
 VERDICTS = {"SIGN", "SIGN_WITH_CHANGE", "BLOCK", "ERROR"}
 _BLOCKING = {"BLOCK", "ERROR"}
@@ -28,6 +33,53 @@ _RETURN_CONTRACT = (
     " reply with a single JSON object on its own line:\n"
     '  {"verdict": "SIGN" | "SIGN_WITH_CHANGE" | "BLOCK", "findings": ["<issue + file:line + why>"]}\n'
 )
+
+
+def worktree_fingerprint(exclude: Iterable[str] = (".trellis",)) -> Optional[str]:
+    """Content hash (a git tree id) of the tracked files as they are on disk, uncommitted edits
+    included. Content-addressed, so committing after a review doesn't change it, but any edit to a
+    tracked file does. Uses a throwaway copy of the index so the user's staging area is untouched.
+    Returns None outside a git repo. Untracked files are excluded, matching `git diff HEAD`.
+    """
+    def git(*a, env=None):
+        return subprocess.run(["git", *a], capture_output=True, text=True, env=env)
+
+    try:
+        top = git("rev-parse", "--show-toplevel")
+        if top.returncode != 0:
+            return None
+        root = top.stdout.strip()
+        real_index = git("rev-parse", "--git-path", "index").stdout.strip()
+        tmpdir = tempfile.mkdtemp(prefix="trellis-idx-")
+        try:
+            idx = os.path.join(tmpdir, "index")
+            if real_index and os.path.exists(real_index):
+                shutil.copyfile(real_index, idx)
+            env = {**os.environ, "GIT_INDEX_FILE": idx}
+            if git("add", "-u", "--", root, env=env).returncode != 0:
+                return None
+            # drop Trellis's own artifacts if they happen to be tracked, so they never affect the hash
+            for e in exclude:
+                if e:
+                    git("rm", "-r", "-q", "--cached", "--ignore-unmatch", "--",
+                        os.path.join(root, e), env=env)
+            out = git("write-tree", env=env)
+            if out.returncode != 0:
+                return None
+            return out.stdout.strip() or None
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+    except Exception:  # noqa: BLE001 — no git → no fingerprint (the gate reports it can't verify)
+        return None
+
+
+def _excludes(*record_paths: Optional[str]) -> List[str]:
+    """Trellis's own artifacts never count as reviewed code."""
+    out = [".trellis"]
+    for rp in record_paths:
+        if rp and not Path(rp).is_absolute() and not Path(rp).parts[:1] == (".trellis",):
+            out.append(str(rp))
+    return out
 
 
 def normalize_verdict(s: Optional[str]) -> str:
@@ -130,7 +182,10 @@ def _summarize(results: List[LensResult]) -> tuple[dict, dict]:
     blockers = [r for r in results if r.verdict in _BLOCKING]
     total_findings = sum(len(r.findings) for r in results)
     all_sign_no_findings = bool(results) and len(signs) == len(results) and total_findings == 0
-    verdict = "BLOCKED" if blockers else ("CHANGES" if changes else "PASS")
+    if not results:
+        verdict = "NO_LENSES"   # nothing reviewed — fail-closed, never a vacuous PASS
+    else:
+        verdict = "BLOCKED" if blockers else ("CHANGES" if changes else "PASS")
     summary = {
         "verdict": verdict,
         "signs": len(signs),
@@ -173,6 +228,7 @@ def run_review(
     context = contract_text + "\n---DIFF---\n" + (diff or "")
     context_hash = hashlib.sha256(context.encode()).hexdigest()[:16]
     contract_hash = hashlib.sha256(contract_text.encode()).hexdigest()[:16] if contract_text else None
+    code_hash = worktree_fingerprint(_excludes(out_path))
 
     if lenses:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallelism)) as ex:
@@ -185,6 +241,7 @@ def run_review(
         "contract": str(contract_path) if contract_path else None,
         "contract_hash": contract_hash,
         "context_hash": context_hash,
+        "code_hash": code_hash,
         "created_at": now,
         "lenses": [asdict(r) for r in results],
         "summary": summary,
@@ -202,7 +259,7 @@ def check_review_record(
     *,
     fail_on_rubber_stamp: bool = False,
 ) -> tuple[bool, str]:
-    """Gate helper: a fresh, non-BLOCK review record for the current contract must exist."""
+    """Gate helper: a fresh, non-BLOCK review record for the current contract AND code must exist."""
     p = Path(record_path)
     if not p.exists():
         return (False, f"no review record at {record_path} — run `trellis review`")
@@ -214,9 +271,21 @@ def check_review_record(
         cur = hashlib.sha256(Path(contract).read_text().encode()).hexdigest()[:16]
         if rec.get("contract_hash") != cur:
             return (False, "review record is STALE — it doesn't match the current contract; re-run `trellis review`")
+    cur_code = worktree_fingerprint(_excludes(record_path))
+    code_note = ""
+    if cur_code is not None:
+        if rec.get("code_hash") != cur_code:
+            return (False, "review record is STALE — the code changed since it was reviewed; "
+                           "re-run `trellis review`")
+    else:
+        code_note = " · code freshness not verifiable (not a git repo)"
     sv = (rec.get("summary") or {}).get("verdict")
+    if sv == "NO_LENSES" or not (rec.get("metrics") or {}).get("lens_count"):
+        return (False, "review ran zero lenses — configure `lenses:` in trellis.yaml")
+    if sv not in ("PASS", "CHANGES", "BLOCKED"):
+        return (False, f"review record has an unrecognised verdict {sv!r}")
     if sv == "BLOCKED":
         return (False, f"review is BLOCKED ({(rec.get('summary') or {}).get('blockers')} blocking lens)")
     if fail_on_rubber_stamp and (rec.get("metrics") or {}).get("all_sign_no_findings"):
         return (False, "every lens SIGNed with zero findings — looks like a rubber stamp")
-    return (True, f"review {sv} · {(rec.get('metrics') or {}).get('lens_count')} lenses")
+    return (True, f"review {sv} · {(rec.get('metrics') or {}).get('lens_count')} lenses{code_note}")

@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import yaml
 
@@ -32,6 +32,10 @@ class Finding:
 
 _FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
 _VALID_STATES = {"asserted", "deferred", "n_a"}
+# Scaffold markers (`trellis draft` emits "TODO — ..."): a field that still *starts* with one hasn't
+# been written yet, so it must not satisfy the gate. Anchored, so prose that merely mentions a
+# marker ("lint rejects TODO targets") is not a false positive.
+_PLACEHOLDER = re.compile(r"^\W*(TODO|TBD|FIXME)\b", re.IGNORECASE)
 
 
 def parse_contract(text: str) -> Tuple[dict, str]:
@@ -49,12 +53,35 @@ def load_contract(path: str | Path) -> Tuple[dict, str]:
     return parse_contract(Path(path).read_text())
 
 
-def validate_contract(meta: dict, axis_catalog: Dict[str, List[str]]) -> List[Finding]:
+def _placeholders(meta: dict) -> Iterable[Tuple[str, str]]:
+    """Yield (field-path, text) for every human-authored string that is still a placeholder."""
+    def walk(node, path: str):
+        if isinstance(node, str):
+            if _PLACEHOLDER.search(node):
+                yield path, node
+        elif isinstance(node, dict):
+            for k, v in node.items():
+                yield from walk(v, f"{path}.{k}" if path else str(k))
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                yield from walk(v, f"{path}[{i}]")
+
+    for key in ("goal", "non_goals", "acceptance"):
+        yield from walk(meta.get(key), key)
+    qa = meta.get("quality_axes") or {}
+    if isinstance(qa, dict):
+        yield from walk(qa.get("kpis"), "quality_axes.kpis")
+        yield from walk(qa.get("axes"), "quality_axes.axes")
+
+
+def validate_contract(meta: dict, axis_catalog: Dict[str, List[str]],
+                      tiers: Optional[Iterable[str]] = None) -> List[Finding]:
     """Validate a contract's frontmatter against the project's axis catalog.
 
     ``axis_catalog`` maps a profile letter (e.g. "C", "D") to the list of quality axes that apply
     to it (e.g. C -> [accuracy, reasonableness, latency]). Every axis of every declared profile
-    must be accounted for. Errors fail the build; warnings don't.
+    must be accounted for. ``tiers`` (the project's tier names) makes an undeclared ``tier`` an
+    error; omit it to skip that check. Errors fail the build; warnings don't.
     """
     findings: List[Finding] = []
 
@@ -68,6 +95,11 @@ def validate_contract(meta: dict, axis_catalog: Dict[str, List[str]]) -> List[Fi
     for key in ("id", "goal", "tier", "acceptance", "quality_axes"):
         if not meta.get(key):
             err("C001", f"missing required field: {key!r}")
+    tier = meta.get("tier")
+    if tiers is not None and tier and str(tier) not in set(tiers):
+        err("C013", f"tier {tier!r} is not defined in trellis.yaml (known: {', '.join(tiers) or 'none'})")
+    for path, text in _placeholders(meta):
+        err("C012", f"{path} is still a placeholder ({text[:60]!r}) — write the real content")
     if not meta.get("non_goals"):
         warn("C010", "no non_goals declared — scope creep is easier without an explicit out-list")
 
@@ -92,6 +124,10 @@ def validate_contract(meta: dict, axis_catalog: Dict[str, List[str]]) -> List[Fi
     musthave: set[tuple[str, str]] = set()
     for k in kpis:
         if isinstance(k, dict) and k.get("must_have"):
+            if not str(k.get("target") or "").strip():
+                err("C014", f"must_have KPI {k.get('id', '?')!r} has no target — a KPI without a "
+                            f"behavioral target proves nothing")
+                continue
             musthave.add((str(k.get("axis")), str(k.get("profile"))))
 
     for prof in profiles:

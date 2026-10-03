@@ -60,11 +60,11 @@ lenses:
   # ── CODE lenses (group: code) — run on the diff via `trellis review` ──────────────
   - name: static                                   # deterministic: exits 0 on pass (no LLM)
     group: code
-    command: "ruff check . && mypy src || true"    # replace with your analyzers
+    command: "ruff check . && mypy src"    # replace with your analyzers
     deterministic: true
   # - name: correctness                            # LLM lens on model A
   #   group: code
-  #   command: "claude -p --model claude-sonnet-4"
+  #   command: "claude -p --model claude-sonnet-5"
   #   persona: "You are a rigorous correctness reviewer. Trace every changed path."
   # - name: security                               # LLM lens on model B (cross-model)
   #   group: code

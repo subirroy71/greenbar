@@ -27,5 +27,5 @@ review:
   parallelism: 4
   timeout_s: 300
 lenses:
-  - { name: static, group: code, command: "npx eslint . && npx tsc --noEmit || true", deterministic: true }
+  - { name: static, group: code, command: "npx eslint . && npx tsc --noEmit", deterministic: true }
   # add LLM/cross-model code + design lenses (see the generic template / lenses/ pack)

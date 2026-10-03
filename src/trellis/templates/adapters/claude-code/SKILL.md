@@ -1,3 +1,8 @@
+---
+name: trellis-loop
+description: Author a Trellis contract for any non-trivial change, lint it, implement against it test-first, and run the tier's gates before pushing. Use when starting a feature, fix, or refactor in a repo that has a trellis.yaml.
+---
+
 # Trellis loop — author the contract, then let the gates prove it
 
 Use this skill for any non-trivial change. It makes the agent produce the artifacts Trellis

@@ -2,6 +2,7 @@
 fail-closed on timeout/unparseable), and the review gate (missing/stale/blocked)."""
 import json
 
+import pytest
 
 from trellis.review import (
     LensResult,
@@ -108,6 +109,10 @@ class TestCommandProvider:
 
 
 class TestReviewGate:
+    @pytest.fixture(autouse=True)
+    def _outside_git(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)  # no repo → code freshness isn't checkable; tested separately
+
     def test_missing_record_fails(self, tmp_path):
         ok, msg = check_review_record(None, str(tmp_path / "none.json"))
         assert ok is False and "no review record" in msg

@@ -24,7 +24,7 @@ jobs:
           python-version: "${{ matrix.python-version }}"
       - run: pip install -e ".[dev]"
       - run: pytest -q
-      - run: trellis gate scoped --contract contracts/CONTRACT.md -v  # dogfood: the tool gates its own release
+      - run: trellis gate scoped --contract contracts/enforcement-hardening.md -v  # dogfood: the tool gates its own release
 
   build:
     needs: test

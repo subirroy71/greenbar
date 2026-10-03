@@ -6,8 +6,34 @@ All notable changes to Trellis are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.10.0] - 2026-08-03
+## [0.10.0] - 2026-10-03
 First tagged and PyPI-published release (v0.1–v0.9 were developed on `main` but never tagged).
+
+### Fixed — enforcement hardening (the cheapest green build no longer skips the rigor)
+- `trellis lint` rejects contracts that still carry scaffold placeholders (`TODO`/`TBD`/`FIXME`
+  at the start of a goal, non-goal, acceptance criterion, axis or KPI target; C012), a `tier` not
+  defined in `trellis.yaml` (C013), and a `must_have` KPI with no target (C014). An unfilled
+  `trellis draft` contract no longer passes the gate.
+- `trellis lint` on a file without frontmatter is a clean C000 failure, not a traceback.
+- The `review` gate checks code freshness: the record now carries a content fingerprint of the
+  tracked tree, and the gate fails as STALE if any tracked file changed since the review
+  (committing the reviewed content keeps it fresh). Previously only the contract was compared.
+- A review with zero lenses is `NO_LENSES` — `trellis review` exits 1 and the gate fails —
+  instead of a vacuous PASS.
+- `run:` gates time out (gate `timeout_s`, top-level `gate_timeout_s`, default 1800s) instead of
+  hanging CI or an agent's MCP call.
+- Preset and template deterministic lenses no longer end in `|| true` (they always signed off).
+- The shipped PR workflow never falls back to an arbitrary contract (`ls -t`): a PR binds one via
+  `Trellis-Contract: <path>` in its description or by changing exactly one contract. Gates run
+  with the base branch's `trellis.yaml`, so a PR can't loosen its own policy. PR-controlled values
+  reach the shell via env vars, not `${{ }}` interpolation.
+
+### Added
+- Durable gate history for `accountability`: `trellis gate --notes` writes the event as a git note
+  (`refs/notes/trellis`); `report`/`accountability` read notes plus the local file (`--no-notes`
+  to skip). `TRELLIS_COMMIT` overrides HEAD (PR runs use the head SHA, not GitHub's synthetic
+  merge commit). The PR workflow's `record` job notes the merged PR's check result on the landed
+  commit. The MCP `trellis_gate` tool now records history too.
 
 ### Added
 - `trellis mcp` — a minimal MCP (Model Context Protocol) server over stdio, in pure stdlib

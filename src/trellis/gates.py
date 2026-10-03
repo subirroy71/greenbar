@@ -21,6 +21,8 @@ from .config import TrellisConfig
 from .contract import load_contract, validate_contract
 from .review import check_review_record
 
+DEFAULT_RUN_TIMEOUT_S = 1800  # per `run:` gate; override with gate `timeout_s` or top-level `gate_timeout_s`
+
 
 @dataclass
 class GateResult:
@@ -64,7 +66,7 @@ def run_gate(name: str, spec: dict, cfg: TrellisConfig, contract: Optional[str])
             meta, _ = load_contract(contract)
         except Exception as exc:  # noqa: BLE001 — surface parse errors as a gate failure
             return GateResult(name, False, f"contract parse error: {exc}")
-        findings = validate_contract(meta, cfg.axes)
+        findings = validate_contract(meta, cfg.axes, tiers=list(cfg.tiers))
         errors = [x for x in findings if x.level == "error"]
         detail = "\n".join(f"    {x}" for x in findings) or "    ok"
         return GateResult(name, not errors, detail)
@@ -85,7 +87,13 @@ def run_gate(name: str, spec: dict, cfg: TrellisConfig, contract: Optional[str])
         return GateResult(name, ok, "found" if ok else f"missing required artifact: {target}")
 
     if "run" in spec:
-        proc = subprocess.run(spec["run"], shell=True, capture_output=True, text=True)
+        # a hung check must fail the gate, not hang CI or an agent's MCP call
+        timeout_s = float(spec.get("timeout_s") or cfg.raw.get("gate_timeout_s") or DEFAULT_RUN_TIMEOUT_S)
+        try:
+            proc = subprocess.run(spec["run"], shell=True, capture_output=True, text=True,
+                                  timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            return GateResult(name, False, f"timed out after {timeout_s:g}s: {spec['run']}")
         detail = (proc.stdout + proc.stderr).strip()
         return GateResult(name, proc.returncode == 0, detail[-4000:])
 
@@ -104,3 +112,13 @@ def run_tier(tier: str, cfg: TrellisConfig, contract: Optional[str] = None) -> L
             continue
         results.append(run_gate(gate_name, spec, cfg, contract))
     return results
+
+
+def gate_event(tier: str, contract: Optional[str], results: List[GateResult],
+               commit: Optional[str]) -> dict:
+    """The history record for one gate run — the unit `report` and `accountability` count."""
+    return {
+        "kind": "gate", "tier": tier, "contract": contract, "ok": all(r.ok for r in results),
+        "commit": commit,   # links a later revert of this commit back to its gate result
+        "gates": [{"name": r.name, "ok": r.ok} for r in results],
+    }

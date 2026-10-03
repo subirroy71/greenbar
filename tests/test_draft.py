@@ -35,11 +35,19 @@ class TestParsePRD:
 
 
 class TestBuildContract:
-    def test_drafted_contract_lints_clean(self):
+    def test_drafted_contract_is_structurally_valid_but_not_gate_ready(self):
         content = build_contract(parse_prd(_PRD), "prd-014-rate-limit", "critical", _CATALOG, _PRD)
         meta, _ = parse_contract(content)
         errors = [f for f in validate_contract(meta, _CATALOG) if f.level == "error"]
-        assert errors == []  # A1 / A3 — structurally valid out of the box
+        # structurally valid out of the box: the only errors are the TODO targets left to fill
+        assert errors and {f.code for f in errors} == {"C012"}
+
+    def test_filled_draft_lints_clean(self):
+        content = build_contract(parse_prd(_PRD), "prd-014-rate-limit", "critical", _CATALOG, _PRD)
+        content = content.replace("TODO — a behavioral target (error-rate / effect-size / equality)",
+                                  "0 failing acceptance criteria")
+        meta, _ = parse_contract(content)
+        assert [f for f in validate_contract(meta, _CATALOG) if f.level == "error"] == []
 
     def test_every_axis_asserted_with_a_musthave_kpi(self):
         meta, _ = parse_contract(build_contract(ParsedPRD(goal="g"), "x", "scoped", _CATALOG))
@@ -61,7 +69,11 @@ class TestDraftCLI:
         assert main(["draft", "PRD.md", "--id", "rate-limit"]) == 0
         out = tmp_path / "contracts" / "rate-limit.md"
         assert out.exists()
-        assert main(["lint", str(out)]) == 0  # A1: the draft lints clean
+        # an unfilled draft must not pass the gate — the cheapest path can't be a green build
+        assert main(["lint", str(out)]) == 1
+        out.write_text(out.read_text().replace(
+            "TODO — a behavioral target (error-rate / effect-size / equality)", "0 failing criteria"))
+        assert main(["lint", str(out)]) == 0
 
 
 class TestPresets:

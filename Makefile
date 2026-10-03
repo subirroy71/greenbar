@@ -7,7 +7,7 @@ test:  ## run the test suite
 	pytest -q
 
 gate:  ## run the scoped gate on this repo's own contract
-	trellis gate scoped --contract contracts/CONTRACT.md
+	trellis gate scoped --contract contracts/enforcement-hardening.md
 
 video:  ## prepare NotebookLM inputs (AUDIENCE/FORMAT/MINUTES/TONE override defaults)
 	python scripts/notebooklm/prepare_video.py \

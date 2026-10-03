@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 MARKER = "<!-- trellis-report -->"
 
 _ICON = {
-    "PASS": "✅", "CHANGES": "🔸", "BLOCKED": "⛔",
+    "PASS": "✅", "CHANGES": "🔸", "BLOCKED": "⛔", "NO_LENSES": "⛔",
     "SIGN": "✅", "SIGN_WITH_CHANGE": "🔸", "BLOCK": "⛔", "ERROR": "⚠️",
 }
 

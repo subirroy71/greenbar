@@ -39,10 +39,11 @@ def _lint(args: dict) -> str:
     from .config import load_config
     meta, _ = parse_contract(Path(args["contract"]).read_text())
     try:
-        axes = load_config(args.get("config")).axes
+        cfg = load_config(args.get("config"))
+        axes, tiers = cfg.axes, list(cfg.tiers)
     except Exception:  # noqa: BLE001
-        axes = {"C": ["correctness", "reasonableness"]}
-    findings = validate_contract(meta, axes)
+        axes, tiers = {"C": ["correctness", "reasonableness"]}, None
+    findings = validate_contract(meta, axes, tiers=tiers)
     if not findings:
         return f"lint OK — {args['contract']} is well-formed."
     lines = [f"{f.code} [{f.level}] {f.message}" for f in findings]
@@ -82,10 +83,12 @@ def _draft(args: dict) -> str:
 
 def _gate(args: dict) -> str:
     from .config import load_config
-    from .gates import run_tier
+    from .gates import gate_event, run_tier
+    from .history import current_commit, record_event
     cfg = load_config(args.get("config"))
     tier = args.get("tier") or "scoped"
     results = run_tier(tier, cfg, args.get("contract"))
+    record_event(gate_event(tier, args.get("contract"), results, current_commit()))
     ok = sum(1 for r in results if r.ok)
     lines = [f"{'PASS' if r.ok else 'FAIL'}  {r.name}" + (f" — {r.detail}" if r.detail else "")
              for r in results]
