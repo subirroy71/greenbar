@@ -8,6 +8,6 @@ contract validates and its tier's gates are green.
 Public API is intentionally small — see `greenbar.contract`, `greenbar.config`, `greenbar.gates`.
 """
 
-__version__ = "0.10.0"
+__version__ = "0.10.1"
 # Rename the tool here (and in pyproject.toml [project.name] + the console-script) to rebrand.
 TOOL_NAME = "greenbar"

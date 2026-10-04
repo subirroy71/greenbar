@@ -41,7 +41,7 @@ In CI (a change cannot merge unless its tier is green):
 
 ```yaml
 # .github/workflows/greenbar.yml
-- uses: subirroy71/greenbar/action@v0.10.0
+- uses: subirroy71/greenbar/action@v0.10.1
   with:
     tier: scoped
     contract: contracts/<id>.md
