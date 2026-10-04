@@ -24,7 +24,7 @@ jobs:
           python-version: "${{ matrix.python-version }}"
       - run: pip install -e ".[dev]"
       - run: pytest -q
-      - run: greenbar gate scoped --contract contracts/release-readiness.md -v  # dogfood: the tool gates its own release
+      - run: greenbar gate scoped --contract contracts/release-0.10.1.md -v  # dogfood: the tool gates its own release
 
   build:
     needs: test

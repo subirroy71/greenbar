@@ -5,6 +5,8 @@ All notable changes to Greenbar are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.10.1] - 2026-10-03
 ### Fixed
 - PR comments for failing runs are readable: a failing deterministic lens records the tool's
   failure summary (pytest `FAILED`/`ERROR` lines, else the last lines) instead of leading progress
@@ -158,5 +160,6 @@ First tagged and PyPI-published release (v0.1–v0.9 were developed on `main` bu
 - `greenbar init` scaffolding, a reusable GitHub Action, and adapters for Claude Code + Cursor.
 - Dogfooding: the repo carries its own `greenbar.yaml` + `contracts/CONTRACT.md` and gates itself.
 
-[Unreleased]: https://github.com/subirroy71/greenbar/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/subirroy71/greenbar/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/subirroy71/greenbar/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/subirroy71/greenbar/releases/tag/v0.10.0
